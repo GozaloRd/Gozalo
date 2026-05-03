@@ -2,7 +2,6 @@
 
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import dynamic from "next/dynamic";
 import { useDashboard } from "@/contexts/DashboardContext";
 import {
   fetchDashboardAnalytics,
@@ -15,6 +14,10 @@ import LiveOpsAlerts from "@/components/dashboard/LiveOpsAlerts";
 import EventForecastCard from "@/components/dashboard/EventForecastCard";
 import { MobileDashboard } from "@/components/dashboard/MobileDashboard";
 import { MobileDashboardHomeNav } from "@/components/dashboard/MobileDashboardHomeNav";
+import {
+  RevenueBreakdownChart,
+  RevenueTrendChart,
+} from "@/components/dashboard/home/DashboardCharts";
 
 // ---------------------------------------------------------------------------
 // Tipos
@@ -100,16 +103,6 @@ type ReservationsResp = { data?: unknown[]; items?: unknown[]; pagination?: { to
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-const RevenueTrendChart = dynamic(
-  () => import("@/components/dashboard/home/DashboardCharts").then((m) => m.RevenueTrendChart),
-  { ssr: false, loading: () => <SkeletonBlock height={240} /> }
-);
-
-const RevenueBreakdownChart = dynamic(
-  () => import("@/components/dashboard/home/DashboardCharts").then((m) => m.RevenueBreakdownChart),
-  { ssr: false, loading: () => <SkeletonBlock height={240} /> }
-);
 
 const PERIOD_LABEL: Record<PeriodKey, string> = {
   today: "Hoy",
