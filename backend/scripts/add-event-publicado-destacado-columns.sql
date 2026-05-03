@@ -1,0 +1,8 @@
+ALTER TABLE events
+ADD COLUMN IF NOT EXISTS publicado BOOLEAN NOT NULL DEFAULT FALSE,
+ADD COLUMN IF NOT EXISTS destacado BOOLEAN NOT NULL DEFAULT FALSE;
+
+UPDATE events
+SET
+  publicado = CASE WHEN status = 'published' THEN TRUE ELSE FALSE END,
+  destacado = CASE WHEN status = 'published' AND featured = TRUE THEN TRUE ELSE FALSE END;

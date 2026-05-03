@@ -1,0 +1,24 @@
+# PostgreSQL solo para desarrollo. Puerto 5433 para no chocar con un Postgres instalado en Windows (suele usar 5432).
+# Arranque: docker compose up -d
+# Luego en backend/.env: DB_HOST=localhost DB_PORT=5433 DB_PASSWORD=gozalo_dev_secret
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: gozalo-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: gozalo_dev_secret
+      POSTGRES_DB: gozalo_db
+    ports:
+      - "5433:5432"
+    volumes:
+      - gozalo_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d gozalo_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  gozalo_pgdata:

@@ -1,0 +1,30 @@
+# Dependencies
+node_modules/
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+
+# Next.js
+.next/
+out/
+
+# Build / cache
+*.tsbuildinfo
+dist/
+build/
+
+# Uploads / local data (adjust if you need versioned samples)
+backend/uploads/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.log
+
+# Python (if added later)
+__pycache__/
+*.py[cod]
+.venv/
+venv/
