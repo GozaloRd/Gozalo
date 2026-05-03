@@ -1,0 +1,108 @@
+// src/types.ts
+export type EventType = 'COVER' | 'NO_COVER'
+
+export type Venue = {
+  id: string
+  name: string
+  city: string
+  zone?: string
+}
+
+export type Event = {
+  id: string
+  venueId: string
+  name: string
+  startsAt: string // ISO
+  endsAt: string   // ISO
+  type: EventType
+  coverRequired: boolean
+  capacity?: number
+  vibeTags: string[]
+  priceFrom: number
+  coverPrice: number
+  ticketTotal: number
+  ticketSold: number
+  tablesAvailable: number
+}
+
+export type Table = {
+  id: string
+  venueId: string
+  name: string
+  section?: string
+  capacityMax: number
+  minConsumption?: number
+}
+
+export type Ticket = {
+  id: string
+  eventId: string
+  status: 'ACTIVE' | 'USED' | 'CANCELLED'
+  qrToken: string
+  createdAt: string
+  usedAt?: string
+  tableBookingId?: string // opcional: vinculación a mesa (mejora futura)
+}
+
+export type Booking = {
+  id: string
+  eventId: string
+  venueId: string
+  tableId: string
+  tableName: string
+  capacityMax: number
+  partySize: number
+
+  // reglas prepay
+  prepayMode: 'PERCENTAGE' | 'FIXED' | 'NONE'
+  prepayRequired: number
+  prepayPaid: number
+
+  // mesa
+  status: 'CONFIRMED' | 'CANCELLED' | 'EXPIRED'
+  tableActiveAt?: string
+  tableCountEntered: number
+  inviteQrMode: 'REUSABLE' | 'SINGLE_USE'
+
+  createdAt: string
+}
+
+export type TableInvite = {
+  id: string
+  bookingId: string
+  token: string
+  isUsed: boolean
+  usedAt?: string
+  createdAt: string
+}
+
+export type TableSpend = {
+  id: string
+  bookingId: string
+  amount: number
+  category?: 'BOTELLAS' | 'COMBOS' | 'OTROS'
+  quantity?: number
+  note?: string
+  createdAt: string
+}
+
+export type EventCloseout = {
+  id: string
+  eventId: string
+  // Barra
+  barCash: number
+  barCard: number
+  barTransfer: number
+  // Mesas
+  tableCash: number
+  tableCard: number
+  tableTransfer: number
+  notes?: string
+  createdAt: string
+}
+
+export type EventHourStat = {
+  eventId: string
+  hourISO: string // truncado a la hora
+  entries: number
+}
