@@ -26,6 +26,14 @@ const nextConfig = {
       { source: "/dashboard/reportes", destination: "/dashboard/estadisticas", permanent: false },
     ];
   },
+  webpack: (config, { dev }) => {
+    if (dev) {
+      // Caché en disco de webpack en Windows + transpilePackages suele corromperse
+      // (ENOENT vendor-chunks, GET /_next/static/... 404). Memoria evita PackFileCache rotos.
+      config.cache = { type: "memory" };
+    }
+    return config;
+  },
 };
 
 export default nextConfig;

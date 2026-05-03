@@ -10,3 +10,9 @@ if (existsSync(nextDir)) {
 } else {
   process.stdout.write("No .next to remove\n");
 }
+
+const webpackCache = join(root, "node_modules", ".cache");
+if (existsSync(webpackCache)) {
+  rmSync(webpackCache, { recursive: true, force: true });
+  process.stdout.write("Removed node_modules/.cache\n");
+}
