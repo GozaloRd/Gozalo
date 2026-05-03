@@ -1,4 +1,4 @@
-const { Op } = require('sequelize');
+const { Op, fn, col } = require('sequelize');
 const {
   sequelize,
   Event,
@@ -487,6 +487,38 @@ async function eventAggregates(eventId) {
   };
 }
 
+/**
+ * Cuenta tickets vendidos por evento y etiqueta `tickets.ticketType` (en compra suele ir el **nombre**
+ * del tipo, no el UUID). `event_ticket_types.soldCount` no se actualiza al vender → el panel mezclaba
+ * métricas reales con filas de tipos a 0.
+ */
+async function ticketSoldCountsGrouped(eventIds) {
+  if (!eventIds.length) return new Map();
+  const rows = await Ticket.findAll({
+    attributes: ['eventId', 'ticketType', [fn('COUNT', col('Ticket.id')), 'soldQty']],
+    where: {
+      eventId: { [Op.in]: eventIds },
+      status: { [Op.in]: ['paid', 'valid', 'used'] },
+    },
+    group: ['eventId', 'ticketType'],
+    raw: true,
+  });
+  const m = new Map();
+  for (const r of rows) {
+    m.set(`${r.eventId}::${String(r.ticketType)}`, Number(r.soldQty) || 0);
+  }
+  return m;
+}
+
+function resolveTicketTypeSoldCount(soldMap, eventId, tt) {
+  const labels = [tt.id, tt.name, tt.code].filter((x) => x != null && String(x).length > 0).map((x) => String(x));
+  for (const label of labels) {
+    const v = soldMap.get(`${eventId}::${label}`);
+    if (v !== undefined) return v;
+  }
+  return Number(tt.soldCount) || 0;
+}
+
 async function listDashboardEvents({ venueId, scope = 'all' }) {
   const now = new Date();
   /** Eventos cancelados (= eliminados en panel) no deben aparecer en listas operativas. */
@@ -500,11 +532,22 @@ async function listDashboardEvents({ venueId, scope = 'all' }) {
     order: [['startAt', scope === 'past' ? 'DESC' : 'ASC']],
   });
 
+  const eventIds = events.map((e) => e.id);
+  const soldMap = await ticketSoldCountsGrouped(eventIds);
+
   const data = await Promise.all(
-    events.map(async (ev) => ({
-      ...ev.toJSON(),
-      metricas: await eventAggregates(ev.id),
-    }))
+    events.map(async (ev) => {
+      const json = ev.toJSON();
+      const ticketTypes = (json.ticketTypes || []).map((tt) => ({
+        ...tt,
+        soldCount: resolveTicketTypeSoldCount(soldMap, ev.id, tt),
+      }));
+      return {
+        ...json,
+        ticketTypes,
+        metricas: await eventAggregates(ev.id),
+      };
+    })
   );
   return { data };
 }
