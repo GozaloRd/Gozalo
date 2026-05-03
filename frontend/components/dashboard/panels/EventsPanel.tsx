@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { CalendarClock, History, LayoutTemplate, Plus } from "lucide-react";
 import type { QuickAreaConfig } from "@/components/dashboard/quickActions.config";
@@ -9,6 +9,7 @@ import { CreateEventForm } from "@/components/dashboard/panels/CreateEventForm";
 import { PanelFooterLinks } from "@/components/dashboard/panels/PanelFooterLinks";
 import { UpcomingEventsList } from "@/components/dashboard/upcoming/UpcomingEventsList";
 import type { UpcomingEventModel } from "@/components/dashboard/upcoming/UpcomingEventCard";
+import { fetchDashboardEvents } from "@/lib/dashboardApi";
 
 type TabKey = "activos" | "pasados" | "plantillas";
 
@@ -40,6 +41,26 @@ export function EventsPanel({
 }) {
   const [tab, setTab] = useState<TabKey>("activos");
   const [createOpen, setCreateOpen] = useState(false);
+  const [pastEvents, setPastEvents] = useState<UpcomingEventModel[]>([]);
+  const [pastLoading, setPastLoading] = useState(false);
+
+  const loadPastEvents = useCallback(async () => {
+    if (!venueId) return;
+    setPastLoading(true);
+    try {
+      const res = (await fetchDashboardEvents("past", venueId)) as { data?: UpcomingEventModel[] };
+      setPastEvents(res.data ?? []);
+    } catch {
+      setPastEvents([]);
+    } finally {
+      setPastLoading(false);
+    }
+  }, [venueId]);
+
+  useEffect(() => {
+    if (tab !== "pasados" || !venueId) return;
+    void loadPastEvents();
+  }, [tab, venueId, loadPastEvents]);
 
   return (
     <div className="space-y-4">
@@ -92,14 +113,25 @@ export function EventsPanel({
       ) : null}
 
       {tab === "pasados" ? (
-        <div className="rounded-xl border border-white/[0.08] bg-zinc-950/50 p-4 text-center">
-          <History className="mx-auto h-10 w-10 text-slate-600" aria-hidden />
-          <p className="mt-2 text-sm text-slate-300">Historial de eventos finalizados</p>
+        <div className="space-y-3">
+          <p className="text-xs font-medium text-slate-400">Historial de eventos finalizados</p>
+          <UpcomingEventsList
+            events={pastEvents}
+            loading={pastLoading}
+            stats={stats}
+            analytics={analytics}
+            nowMs={nowMs}
+            variant="past"
+            onEventUpdated={() => {
+              void loadPastEvents();
+              onRefresh?.();
+            }}
+          />
           <Link
             href="/dashboard/eventos?tab=past"
-            className="mt-4 inline-flex rounded-xl bg-white/[0.08] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-white/12"
+            className="block w-full rounded-xl border border-white/[0.1] bg-white/[0.06] py-2.5 text-center text-sm font-semibold text-white transition hover:bg-white/10"
           >
-            Ver eventos pasados
+            Ver y editar en pantalla completa →
           </Link>
         </div>
       ) : null}

@@ -24,6 +24,7 @@ export function UpcomingEventsList({
   analytics,
   nowMs,
   onEventUpdated,
+  variant = "upcoming",
 }: {
   events: UpcomingEventModel[];
   loading: boolean;
@@ -31,12 +32,16 @@ export function UpcomingEventsList({
   analytics: Analytics | null;
   nowMs: number;
   onEventUpdated?: () => void;
+  /** `past`: orden más reciente primero y textos de historial. */
+  variant?: "upcoming" | "past";
 }) {
   const sorted = useMemo(() => {
-    return [...events]
+    const rows = [...events]
       .filter((e) => e.status !== "cancelled")
       .sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime());
-  }, [events]);
+    if (variant === "past") rows.reverse();
+    return rows;
+  }, [events, variant]);
 
   if (loading && sorted.length === 0) {
     return (
@@ -72,12 +77,14 @@ export function UpcomingEventsList({
             />
           </svg>
         </div>
-        <p className="mt-4 text-center text-sm font-medium text-slate-300">No tienes próximos eventos</p>
+        <p className="mt-4 text-center text-sm font-medium text-slate-300">
+          {variant === "past" ? "No hay eventos pasados en este local." : "No tienes próximos eventos"}
+        </p>
         <Link
-          href="/dashboard/eventos"
+          href={variant === "past" ? "/dashboard/eventos?tab=past" : "/dashboard/eventos"}
           className="mt-4 rounded-xl bg-[#2979FF] px-5 py-2.5 text-sm font-semibold text-white shadow-lg transition hover:bg-[#1e6bef] active:scale-[0.98]"
         >
-          Crear evento
+          {variant === "past" ? "Ir a eventos" : "Crear evento"}
         </Link>
       </div>
     );
@@ -92,6 +99,7 @@ export function UpcomingEventsList({
           stats={stats}
           analytics={analytics}
           nowMs={nowMs}
+          variant={variant}
           onEventUpdated={onEventUpdated}
         />
       ))}

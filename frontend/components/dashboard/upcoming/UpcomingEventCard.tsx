@@ -70,19 +70,23 @@ export function UpcomingEventCard({
   stats,
   analytics,
   nowMs,
+  variant = "upcoming",
   onEventUpdated,
 }: {
   event: UpcomingEventModel;
   stats: Stats | null;
   analytics: Analytics | null;
   nowMs: number;
+  /** `past`: historial (sin cuenta atrás hacia el inicio). */
+  variant?: "upcoming" | "past";
   onEventUpdated?: () => void;
 }) {
   const { venueId } = useDashboard();
   const [panel, setPanel] = useState<Panel>(null);
 
   const live = isLive(event, nowMs);
-  const cd = useCountdown(event.startAt, !live);
+  const showCountdown = variant === "upcoming" && !live;
+  const cd = useCountdown(event.startAt, showCountdown);
 
   const sold = event.metricas?.ticketsVendidos ?? 0;
   const reservations = event.metricas?.reservasHechas ?? 0;
@@ -127,6 +131,10 @@ export function UpcomingEventCard({
             <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-semibold text-emerald-400">
               EN VIVO
             </span>
+          ) : variant === "past" ? (
+            <span className="rounded-full bg-zinc-600/30 px-2 py-0.5 text-[10px] font-semibold text-zinc-300">
+              FINALIZADO
+            </span>
           ) : (
             <span className="rounded-full bg-purple-500/20 px-2 py-0.5 text-[10px] font-semibold text-purple-400">
               PRÓXIMO
@@ -140,7 +148,7 @@ export function UpcomingEventCard({
 
         <p className="text-sm text-zinc-400">{formatEventWhen(event.startAt)}</p>
 
-        {!live && (
+        {showCountdown && (
           <div className="grid grid-cols-3 gap-2 text-center">
             <div className="rounded-lg border border-white/[0.06] bg-zinc-900 py-2">
               <div className="text-xl font-bold tabular-nums text-white">{cd.days}</div>
@@ -177,7 +185,7 @@ export function UpcomingEventCard({
           </div>
         </div>
 
-        {capacity > 0 && !live && (
+        {capacity > 0 && !live && variant === "upcoming" && (
           <div>
             <div className="flex justify-between text-[10px] uppercase tracking-wider text-zinc-500">
               <span>Ocupación proyectada</span>
