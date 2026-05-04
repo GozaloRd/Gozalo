@@ -72,7 +72,7 @@ function apiBase() {
 }
 
 const PUBLIC_REVALIDATE_SECONDS = 45;
-const PUBLIC_TIMEOUT_MS = Number(process.env.NEXT_PUBLIC_PUBLIC_API_TIMEOUT_MS || 9000);
+const PUBLIC_TIMEOUT_MS = Number(process.env.NEXT_PUBLIC_PUBLIC_API_TIMEOUT_MS || 20000);
 
 async function fetchJsonWithTimeout<T>(url: string): Promise<T | null> {
   const controller = new AbortController();

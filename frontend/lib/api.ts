@@ -4,7 +4,8 @@ const BASE =
   typeof window !== "undefined"
     ? process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000"
     : process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
-const API_TIMEOUT_MS = Number(process.env.NEXT_PUBLIC_API_TIMEOUT_MS || 12000);
+/** Por defecto 45s: registro/login y dashboard pueden superar 12s en local o API fría. */
+const API_TIMEOUT_MS = Number(process.env.NEXT_PUBLIC_API_TIMEOUT_MS || 45000);
 
 export function getToken(): string | null {
   return getAuthToken();
@@ -30,8 +31,14 @@ export async function api<T>(
       },
     });
   } catch (e) {
-    if ((e as { name?: string })?.name === "AbortError") {
+    const name = (e as { name?: string })?.name;
+    if (name === "AbortError") {
       throw new Error("La solicitud tardó demasiado. Intenta de nuevo.");
+    }
+    if (e instanceof TypeError) {
+      throw new Error(
+        "No se pudo conectar con el servidor. Comprueba que la API esté en marcha (NEXT_PUBLIC_API_URL)."
+      );
     }
     throw e;
   } finally {
