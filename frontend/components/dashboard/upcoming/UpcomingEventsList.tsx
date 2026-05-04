@@ -13,15 +13,10 @@ type Stats = {
   };
 };
 
-type Analytics = {
-  summary: { revenue: { total: number } };
-};
-
 export function UpcomingEventsList({
   events,
   loading,
   stats,
-  analytics,
   nowMs,
   onEventUpdated,
   variant = "upcoming",
@@ -29,7 +24,6 @@ export function UpcomingEventsList({
   events: UpcomingEventModel[];
   loading: boolean;
   stats: Stats | null;
-  analytics: Analytics | null;
   nowMs: number;
   onEventUpdated?: () => void;
   /** `past`: orden más reciente primero y textos de historial. */
@@ -97,7 +91,6 @@ export function UpcomingEventsList({
           key={ev.id}
           event={ev}
           stats={stats}
-          analytics={analytics}
           nowMs={nowMs}
           variant={variant}
           onEventUpdated={onEventUpdated}

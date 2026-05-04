@@ -255,7 +255,7 @@ export default function DashboardHomePage() {
       </div>
 
       <div className="hidden md:block space-y-6">
-        <NextEventHero next={nextEvent} stats={stats} analytics={analytics} loading={loading && !nextEvent} />
+        <NextEventHero next={nextEvent} stats={stats} loading={loading && !nextEvent} />
 
         {nextEvent?.event && <EventForecastCard eventId={nextEvent.event.id} />}
 
@@ -375,12 +375,10 @@ function QuickActions() {
 function NextEventHero({
   next,
   stats,
-  analytics,
   loading,
 }: {
   next: { event: EventRow; live: boolean } | null;
   stats: Stats | null;
-  analytics: Analytics | null;
   loading: boolean;
 }) {
   if (loading) return <SkeletonBlock height={260} />;
@@ -585,14 +583,10 @@ function NextEventHero({
               </li>
             ))}
           </ul>
-          {analytics?.summary.revenue.total != null && (
-            <div className="mt-4 border-t border-white/5 pt-3">
-              <p className="text-[11px] uppercase tracking-wider text-slate-500">Ingresos totales</p>
-              <p className="mt-0.5 text-sm font-semibold text-white">
-                {formatMoney(analytics.summary.revenue.total)}
-              </p>
-            </div>
-          )}
+          <div className="mt-4 border-t border-white/5 pt-3">
+            <p className="text-[11px] uppercase tracking-wider text-slate-500">Ingresos recaudados</p>
+            <p className="mt-0.5 text-sm font-semibold text-white">{formatMoney(revenue)}</p>
+          </div>
         </aside>
       </div>
     </div>

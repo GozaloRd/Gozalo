@@ -43,10 +43,6 @@ type Stats = {
   };
 };
 
-type Analytics = {
-  summary: { revenue: { total: number } };
-};
-
 function formatEventWhen(iso: string) {
   return new Date(iso).toLocaleString("es-DO", {
     weekday: "short",
@@ -68,14 +64,12 @@ type Panel = "gestionar" | "tickets" | "mesas" | null;
 export function UpcomingEventCard({
   event,
   stats,
-  analytics,
   nowMs,
   variant = "upcoming",
   onEventUpdated,
 }: {
   event: UpcomingEventModel;
   stats: Stats | null;
-  analytics: Analytics | null;
   nowMs: number;
   /** `past`: historial (sin cuenta atrás hacia el inicio). */
   variant?: "upcoming" | "past";
@@ -178,7 +172,7 @@ export function UpcomingEventCard({
             <div className="mt-0.5 font-semibold tabular-nums text-white">{reservations}</div>
           </div>
           <div className="rounded-lg border border-white/[0.06] bg-zinc-900 px-1 py-2">
-            <div className="text-[9px] uppercase text-zinc-500">Ingresos est.</div>
+            <div className="text-[9px] uppercase text-zinc-500">Recaudado</div>
             <div className="mt-0.5 font-semibold tabular-nums text-[11px] text-white">
               {formatMoney(event.metricas?.ingresosEstimadosRD ?? 0)}
             </div>
@@ -235,12 +229,12 @@ export function UpcomingEventCard({
           </div>
         </div>
 
-        {analytics?.summary.revenue.total != null && (
-          <p className="text-[10px] text-zinc-500">
-            Ingresos totales (panel):{" "}
-            <span className="font-semibold text-white">{formatMoney(analytics.summary.revenue.total)}</span>
-          </p>
-        )}
+        <p className="text-[10px] text-zinc-500">
+          Ingresos recaudados:{" "}
+          <span className="font-semibold text-white">
+            {formatMoney(event.metricas?.ingresosEstimadosRD ?? 0)}
+          </span>
+        </p>
 
         <div className="flex flex-wrap gap-2 pt-1">
           <button

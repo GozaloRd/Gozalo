@@ -15,6 +15,7 @@ import { EventsPanel } from "@/components/dashboard/panels/EventsPanel";
 import { SalesPanel } from "@/components/dashboard/panels/SalesPanel";
 import { SettingsPanel } from "@/components/dashboard/panels/SettingsPanel";
 import { StatsPanel } from "@/components/dashboard/panels/StatsPanel";
+import type { MobileAnalytics } from "@/components/dashboard/panels/mobilePanelTypes";
 import type { UpcomingEventModel } from "@/components/dashboard/upcoming/UpcomingEventCard";
 import type { QuickAreaId } from "@/components/dashboard/quickActions.config";
 import { MOBILE_AREA_BORDER_L } from "@/components/dashboard/mobile/shared/mobileAreaTokens";
@@ -36,7 +37,7 @@ const panelVariants = {
 export type AreaSubmenuPanelProps = {
   upcomingEvents: UpcomingEventModel[];
   stats: ComponentProps<typeof EventsPanel>["stats"];
-  analytics: ComponentProps<typeof EventsPanel>["analytics"];
+  analytics: MobileAnalytics | null;
   loading: boolean;
   nowMs: number;
   venueId: string;
@@ -90,7 +91,6 @@ export function AreaSubmenu({
             venueCity={venueCity}
             upcomingEvents={upcomingEvents}
             stats={stats}
-            analytics={analytics}
             loading={loading}
             nowMs={nowMs}
             opsAlertCount={opsAlertCount}

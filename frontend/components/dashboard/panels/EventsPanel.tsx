@@ -14,7 +14,6 @@ import { fetchDashboardEvents } from "@/lib/dashboardApi";
 type TabKey = "activos" | "pasados" | "plantillas";
 
 type ListStats = Parameters<typeof UpcomingEventsList>[0]["stats"];
-type ListAnalytics = Parameters<typeof UpcomingEventsList>[0]["analytics"];
 
 export function EventsPanel({
   area,
@@ -22,7 +21,6 @@ export function EventsPanel({
   venueCity,
   upcomingEvents,
   stats,
-  analytics,
   loading,
   nowMs,
   opsAlertCount,
@@ -33,7 +31,6 @@ export function EventsPanel({
   venueCity?: string;
   upcomingEvents: UpcomingEventModel[];
   stats: ListStats;
-  analytics: ListAnalytics;
   loading: boolean;
   nowMs: number;
   opsAlertCount: number;
@@ -105,7 +102,6 @@ export function EventsPanel({
             events={upcomingEvents}
             loading={loading}
             stats={stats}
-            analytics={analytics}
             nowMs={nowMs}
             onEventUpdated={onRefresh}
           />
@@ -119,7 +115,6 @@ export function EventsPanel({
             events={pastEvents}
             loading={pastLoading}
             stats={stats}
-            analytics={analytics}
             nowMs={nowMs}
             variant="past"
             onEventUpdated={() => {
