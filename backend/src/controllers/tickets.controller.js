@@ -3,7 +3,7 @@ const ticketsService = require('../services/tickets.service');
 async function purchaseTickets(req, res) {
   try {
     const result = await ticketsService.purchaseTickets({
-      userId: req.userId,
+      userId: req.userId ?? null,
       body: req.body,
     });
     return res.status(201).json(result);

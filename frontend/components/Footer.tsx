@@ -1,4 +1,5 @@
 import Link from "next/link";
+import GozaloSiteLogo from "@/components/GozaloSiteLogo";
 
 const LEGAL_LINKS = [
   { href: "/prensa", label: "Prensa" },
@@ -111,7 +112,7 @@ export function Footer() {
           {/* Fila 1: mark + copyright · idioma + links legales */}
           <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex items-center gap-3">
-              <FooterMark />
+              <GozaloSiteLogo size="sm" className="font-display" />
               <p className="text-[11px] text-white/40">
                 © {new Date().getFullYear()} Gozalo Dominicana. Todos los derechos reservados.
               </p>

@@ -1,5 +1,5 @@
 const express = require('express');
-const { authenticate } = require('../middleware/auth');
+const { authenticate, optionalAuth } = require('../middleware/auth');
 const { requireVenueAccess } = require('../middleware/venueAccess');
 const ticketsController = require('../controllers/tickets.controller');
 const {
@@ -10,7 +10,7 @@ const {
 
 const router = express.Router();
 
-router.post('/purchase', authenticate, purchaseTicketsValidator, validateRequest, ticketsController.purchaseTickets);
+router.post('/purchase', optionalAuth, purchaseTicketsValidator, validateRequest, ticketsController.purchaseTickets);
 router.get('/my', authenticate, ticketsController.listMyTickets);
 
 router.get(

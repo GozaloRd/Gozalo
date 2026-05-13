@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { motion } from "framer-motion";
 import { X } from "lucide-react";
 import { useMemo } from "react";
@@ -166,12 +165,6 @@ export function EventTablesPanel({ eventId, venueId, open, onClose }: Props) {
               Ingresos por mesas (registrados):{" "}
               <span className="font-semibold text-white">{formatMoney(summary.ingresos)}</span>
             </p>
-            <Link
-              href="/dashboard/mesas"
-              className="mt-3 inline-flex text-sm font-medium text-[#2979FF] hover:underline"
-            >
-              Ver detalle completo →
-            </Link>
           </div>
         </>
       )}

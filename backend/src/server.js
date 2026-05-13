@@ -34,9 +34,21 @@ const splitRoutes = require('./routes/split.routes');
 const app = express();
 const PORT = process.env.PORT || 4000;
 
+const allowedOrigins = [
+  process.env.FRONTEND_URL,
+  'http://localhost:3000',
+  'http://localhost:3001',
+  'http://127.0.0.1:3000',
+  'http://127.0.0.1:3001',
+].filter(Boolean);
+
 app.use(
   cors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+    origin(origin, callback) {
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.includes(origin)) return callback(null, true);
+      return callback(new Error(`CORS bloqueado para origen: ${origin}`));
+    },
     credentials: true,
   })
 );

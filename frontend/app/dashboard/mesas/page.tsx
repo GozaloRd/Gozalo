@@ -80,7 +80,18 @@ export default function DashboardMesasPage() {
   }, [venueId, eventId]);
 
   useEffect(() => {
-    load();
+    void load();
+    const id = window.setInterval(() => {
+      void load();
+    }, 20_000);
+    const onFocus = () => {
+      void load();
+    };
+    window.addEventListener("focus", onFocus);
+    return () => {
+      window.clearInterval(id);
+      window.removeEventListener("focus", onFocus);
+    };
   }, [load]);
 
   const resolvedEventId = eventId || events[0]?.id || "";

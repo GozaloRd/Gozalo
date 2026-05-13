@@ -7,10 +7,15 @@ export type DashboardReservationRow = {
   evento?: { id?: string; titulo?: string };
   mesa?: string;
   tableId?: string | null;
+  partySize?: number;
   montoRD?: number;
+  ingresoNetoLocalRD?: number;
   estado?: string;
+  /** Check-in (API dashboard) */
+  horaCheckIn?: string | null;
   notes?: string | null;
   createdAt?: string;
+  creadoEn?: string;
 };
 
 export function reservationMatchesTable(r: DashboardReservationRow, t: VenueTableRow): boolean {

@@ -374,6 +374,7 @@ function DesktopHero({ fanEvents }: { fanEvents: LandingEvent[] }) {
                         }}
                         index={i}
                         size="sm"
+                        variant="flush"
                         className="!max-w-none"
                       />
                     </div>
@@ -437,7 +438,7 @@ function MobileHero({ fanEvents }: { fanEvents: LandingEvent[] }) {
       </div>
 
       {/* Misma fila de 5 eventos que en escritorio: scroll horizontal, ancho proporcional */}
-      <div className="relative z-10 mt-6">
+      <div className="relative z-10 mt-6 min-w-0 bg-transparent">
         {cards.length === 0 ? (
           <div className="mx-4 rounded-2xl border border-white/10 bg-white/5 p-5 text-center">
             <p className="text-sm font-semibold text-white">Aún no hay eventos publicados</p>
@@ -454,7 +455,7 @@ function MobileHero({ fanEvents }: { fanEvents: LandingEvent[] }) {
             <p className="mb-3 px-4 text-center text-[10px] font-semibold uppercase tracking-[0.14em] text-white/45">
               Destacados
             </p>
-            <div className="gz-mobile-fan-scroll flex snap-x snap-mandatory gap-2.5 overflow-x-auto px-4 pb-2 sm:gap-3">
+            <div className="gz-mobile-fan-scroll gz-scroll-strip flex touch-pan-x snap-x snap-mandatory gap-2.5 overflow-x-auto border-0 bg-transparent px-4 pb-2 shadow-none outline-none ring-0 sm:gap-3">
               {cards.map((ev, i) => {
                 const yNudge = [0, 6, 2, 8, 4][i % 5];
                 const rot = [-1.2, -0.6, 0, 0.6, 1.2][i % 5];
@@ -479,6 +480,7 @@ function MobileHero({ fanEvents }: { fanEvents: LandingEvent[] }) {
                       }}
                       index={i}
                       size="sm"
+                      variant="flush"
                       className="!max-w-none w-full"
                     />
                   </div>
@@ -518,38 +520,36 @@ function UpcomingEventCard({
       className={`w-full min-w-0 self-start md:w-[240px] md:shrink-0 md:min-w-[240px] ${staggerClass}`}
     >
       <Link
-        href={`/eventos/${event.slug}`}
+        href={`/e/${event.slug}`}
         className="group block w-full max-w-full overflow-hidden rounded-[2rem] border-2 border-white bg-[#2a2a32] shadow-[0_12px_40px_rgba(0,0,0,0.45)] transition-transform duration-300 hover:-translate-y-1"
         aria-label={event.title}
       >
-        <div className="p-2 pt-2.5">
-          <div
-            className="relative w-full max-w-full overflow-hidden rounded-2xl bg-[#12121a]"
-            style={{ aspectRatio: "3 / 4" }}
-          >
-            {showImage ? (
-              <Image
-                src={event.image!}
-                alt={event.title}
-                fill
-                sizes="(max-width: 767px) 48vw, 240px"
-                className="object-cover object-center transition-transform duration-500 group-hover:scale-[1.03]"
-                onError={() => setErrored(true)}
-              />
-            ) : (
-              <div
-                className={`absolute inset-0 bg-gradient-to-br ${gradient}`}
-                aria-hidden
-              />
-            )}
-            <div
-              aria-hidden
-              className="pointer-events-none absolute inset-x-0 bottom-0 h-[18%] bg-gradient-to-t from-black/30 via-black/5 to-transparent"
+        <div
+          className="relative w-full overflow-hidden bg-[#12121a]"
+          style={{ aspectRatio: "3 / 4" }}
+        >
+          {showImage ? (
+            <Image
+              src={event.image!}
+              alt={event.title}
+              fill
+              sizes="(max-width: 767px) 48vw, 240px"
+              className="object-cover object-top transition-transform duration-500 group-hover:scale-[1.03]"
+              onError={() => setErrored(true)}
             />
-          </div>
+          ) : (
+            <div
+              className={`absolute inset-0 bg-gradient-to-br ${gradient}`}
+              aria-hidden
+            />
+          )}
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-x-0 bottom-0 h-[18%] bg-gradient-to-t from-black/30 via-black/5 to-transparent"
+          />
         </div>
 
-        <div className="px-3 pb-1 pt-0">
+        <div className="px-3 pb-1 pt-2">
           <h3 className="line-clamp-2 text-[0.95rem] font-bold leading-tight tracking-tight text-white">
             {event.title}
           </h3>
@@ -700,7 +700,7 @@ function UpcomingEventsSection({ events }: { events: LandingEvent[] }) {
           </div>
         ) : (
           <div
-            className="gz-events-scroll mt-10 grid grid-cols-2 items-start gap-x-[clamp(0.5rem,3.2vw,0.875rem)] gap-y-6 px-4 pb-10 md:mt-14 md:flex md:grid-cols-none md:flex-row md:items-start md:gap-6 md:overflow-x-auto md:pb-28 md:pl-[max(32px,calc((100vw-1360px)/2))] md:pr-[max(32px,calc((100vw-1360px)/2))]"
+            className="gz-events-scroll gz-scroll-strip mt-10 grid touch-pan-x grid-cols-2 items-start gap-x-[clamp(0.5rem,3.2vw,0.875rem)] gap-y-6 border-0 bg-transparent px-4 pb-10 shadow-none outline-none ring-0 md:mt-14 md:flex md:grid-cols-none md:flex-row md:items-start md:gap-6 md:overflow-x-auto md:pb-28 md:pl-[max(32px,calc((100vw-1360px)/2))] md:pr-[max(32px,calc((100vw-1360px)/2))]"
           >
             {events.map((ev, i) => (
               <UpcomingEventCard key={ev.id} event={ev} index={i} />
@@ -916,6 +916,14 @@ export function GozaloLandingPremium({
           animation-duration: 20s;
         }
 
+        /* Carruseles horizontales: sin caja visible, solo el scroll táctil */
+        .gz-scroll-strip {
+          background-color: transparent !important;
+          background-image: none;
+          box-shadow: none !important;
+          border: none !important;
+          -webkit-tap-highlight-color: transparent;
+        }
         /* Oculta la scrollbar del carrusel horizontal */
         .gz-events-scroll::-webkit-scrollbar,
         .gz-mobile-fan-scroll::-webkit-scrollbar {

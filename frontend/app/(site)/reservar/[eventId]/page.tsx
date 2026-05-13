@@ -1,14 +1,15 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { PurchaseFlowEmbeddedCard } from "@/components/public-event/PurchaseFlowTransition";
 import { getToken } from "@/lib/api";
 import { createReservation, type ReservationBreakdown } from "@/lib/customerApi";
+import { getEventCoverImageUrl } from "@/lib/eventCoverImage";
 import { formatMoney } from "@/lib/format";
-import { useTableLayoutBackdrop } from "@/hooks/useTableLayoutBackdrop";
-import { getReservationTableLayoutUrl } from "@/lib/reservationEventImage";
+import { getPublicImageAbsoluteUrl } from "@/lib/publicImageUrl";
 import { fetchPublicEventById, type PublicEventDetail } from "@/lib/publicApi";
 import {
   siteBodyMutedClass,
@@ -37,66 +38,74 @@ function tableAdvancePct(t: { initialPaymentPercent?: number | null }): number {
   return 50;
 }
 
-function zoneAdvanceLabel(zoneTables: Table[]): string {
-  if (zoneTables.length === 0) return "Adelanto —";
-  const advs = zoneTables.map((x) => tableAdvancePct(x));
-  const mn = Math.min(...advs);
-  const mx = Math.max(...advs);
-  if (mn === mx) return mn >= 100 ? "Pago completo" : `Adelanto ${mn}%`;
-  if (mn >= 100 && mx >= 100) return "Pago completo";
-  return `Adelanto ${mn}%–${mx}%`;
-}
+/** Misma altura que el spacer del `Navbar` en (site): el fondo sube y se ve bajo la barra transparente. */
+const SITE_NAV_BLEED =
+  "-mt-[4.25rem] pt-[4.25rem] md:-mt-[4.5rem] md:pt-[4.5rem]";
 
-const ZONE_DOT_COLORS = ["#9B7FCA", "#E879A9", "#22D3EE", "#A78BFA", "#34D399"] as const;
+/** Misma capa que `/e/[...]` y checkout: flyer difuminado + overlay oscuro */
+const RESERVA_BLUR_OVERLAY: CSSProperties = {
+  background: `linear-gradient(
+    180deg,
+    rgba(0,0,0,0.15) 0%,
+    rgba(0,0,0,0.20) 40%,
+    rgba(0,0,0,0.75) 70%,
+    rgba(0,0,0,0.95) 100%
+  )`,
+};
 
-function zoneAccentClass(zone: string): string {
-  let h = 0;
-  for (let i = 0; i < zone.length; i++) h = (h + zone.charCodeAt(i) * 17) % 2147483647;
-  return ZONE_DOT_COLORS[Math.abs(h) % ZONE_DOT_COLORS.length]!;
-}
+/** Vidrio alineado con `CheckoutClient` / `EventPageMobile` */
+const reservaGlassPanel =
+  "rounded-[28px] border border-white/[0.13] bg-gradient-to-b from-white/[0.1] to-white/[0.04] p-5 shadow-[0_32px_80px_-20px_rgba(0,0,0,0.72)] backdrop-blur-[28px]";
+const reservaGlassCard =
+  "rounded-2xl border border-white/[0.13] bg-gradient-to-b from-white/[0.1] to-white/[0.04] shadow-[0_32px_80px_-20px_rgba(0,0,0,0.72)] backdrop-blur-[28px]";
+const reservaGlassInset =
+  "border border-white/[0.12] bg-black/35 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-xl";
 
-function minPriceInZone(ts: Table[]): number {
-  if (ts.length === 0) return 500;
-  const nums = ts.map((t) => (t.minPrice != null && t.minPrice !== "" ? Number(t.minPrice) : 500));
-  return Math.min(...nums);
-}
+/** Cabecera checkout: misma estructura que antes, más transparente (sin bloque opaco). */
+const reservaHeaderPanel =
+  "rounded-[28px] border border-white/[0.09] bg-white/[0.05] p-5 shadow-[0_24px_64px_-28px_rgba(0,0,0,0.55)] backdrop-blur-[22px]";
 
-function IconUsersTiny({ className }: { className?: string }) {
+function ReservaEventBackdrop({ event, children }: { event: PublicEventDetail; children: ReactNode }) {
+  const raw = getEventCoverImageUrl(event);
+  const src = raw ? getPublicImageAbsoluteUrl(raw) : null;
   return (
-    <svg className={className} width={16} height={16} viewBox="0 0 24 24" fill="none" aria-hidden>
-      <path
-        d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"
-        stroke="currentColor"
-        strokeWidth="1.75"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
+    <div className={`relative min-h-screen w-full bg-black ${SITE_NAV_BLEED}`}>
+      {src ? (
+        <div className="absolute inset-0 z-0 overflow-hidden">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={src}
+            alt=""
+            aria-hidden
+            style={{
+              position: "absolute",
+              inset: 0,
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
+              objectPosition: "center top",
+              filter: "blur(40px) brightness(0.35) saturate(1.4)",
+              transform: "scale(1.1)",
+            }}
+          />
+        </div>
+      ) : null}
+      <div className="pointer-events-none absolute inset-0 z-[1]" style={RESERVA_BLUR_OVERLAY} />
+      <div className="relative z-10">{children}</div>
+    </div>
   );
 }
 
-function IconChevronAccordion({ className }: { className?: string }) {
-  return (
-    <svg className={className} width={22} height={22} viewBox="0 0 24 24" fill="none" aria-hidden>
-      <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
-function tableRowTitle(t: Table): string {
-  const raw = String(t.label ?? "").trim();
-  if (/^mesa\b/i.test(raw)) return raw;
-  return raw ? `Mesa ${raw}` : "Mesa";
-}
-
-export default function ReservarPage() {
+function ReservarPageInner() {
   const params = useParams();
   const router = useRouter();
   const searchParams = useSearchParams();
   const eventId = params.eventId as string;
-  const presetTableId = searchParams.get("tableId");
+  const presetTableId =
+    searchParams?.get("tableId") ?? searchParams?.get("table") ?? null;
 
-  const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
+  /** Sin paso de plano/mesas: solo cover (opc.) → pago → éxito */
+  const [step, setStep] = useState<2 | 3 | 4 | null>(null);
   const [event, setEvent] = useState<PublicEventDetail | null>(null);
   const [tables, setTables] = useState<Table[]>([]);
   const [loadingEvent, setLoadingEvent] = useState(true);
@@ -110,16 +119,10 @@ export default function ReservarPage() {
   const [qrImage, setQrImage] = useState<string | null>(null);
   const [breakdown, setBreakdown] = useState<ReservationBreakdown | null>(null);
   const [reservationId, setReservationId] = useState<string | null>(null);
-  /** Paso 1 móvil: zonas desplegables — qué bloques están abiertos */
-  const [mobileZoneOpen, setMobileZoneOpen] = useState<Record<string, boolean>>({});
+  const [buyerEmail, setBuyerEmail] = useState("");
+  const [buyerFullName, setBuyerFullName] = useState("");
 
   useEffect(() => {
-    const token = getToken();
-    if (!token) {
-      router.replace(`/login?next=${encodeURIComponent(`/reservar/${eventId}`)}`);
-      return;
-    }
-
     let active = true;
     void (async () => {
       try {
@@ -146,12 +149,26 @@ export default function ReservarPage() {
     return () => {
       active = false;
     };
-  }, [eventId, presetTableId, router]);
+  }, [eventId, presetTableId]);
+
+  const needsCover = !!event?.requiresCoverForTable;
+
+  /** Tras cargar evento + mesa desde la URL de `/e/...`, ir directo a cover o al checkout de pago */
+  useEffect(() => {
+    if (loadingEvent || !event || done) return;
+    if (!presetTableId || !selected) return;
+    setStep((s) => (s === null ? (needsCover ? 2 : 3) : s));
+  }, [loadingEvent, event?.id, presetTableId, selected?.id, needsCover, done]);
 
   const ticketTypes = useMemo(
     () => (event?.ticketTypes ?? []).filter((t) => t.active !== false),
     [event]
   );
+  const eventHeaderCoverSrc = useMemo(() => {
+    if (!event) return null;
+    const raw = getEventCoverImageUrl(event);
+    return raw ? getPublicImageAbsoluteUrl(raw) : null;
+  }, [event]);
   const selectedCover = useMemo(
     () => ticketTypes.find((t) => (t.id ?? t.name) === selectedCoverId) ?? null,
     [ticketTypes, selectedCoverId]
@@ -159,23 +176,8 @@ export default function ReservarPage() {
   /** Sin selector de personas: se usa la capacidad de la mesa reservada (mismas reglas de API). */
   const partySize = selected ? Math.max(1, selected.capacity) : 2;
   const selectedTableAmount = selected?.minPrice != null ? Number(selected.minPrice) : 500;
-  const needsCover = !!event?.requiresCoverForTable;
   const coverAmount = selectedCover ? Number(selectedCover.price) * partySize : 0;
 
-  const tablesByZone = useMemo(() => {
-    const m = new Map<string, Table[]>();
-    for (const t of tables) {
-      const z = (t.zone ?? "").trim() || "General";
-      if (!m.has(z)) m.set(z, []);
-      m.get(z)!.push(t);
-    }
-    m.forEach((arr) => {
-      arr.sort((a, b) => a.label.localeCompare(b.label, "es", { numeric: true }));
-    });
-    return m;
-  }, [tables]);
-
-  const zoneOrder = useMemo(() => Array.from(tablesByZone.keys()).sort((a, b) => a.localeCompare(b, "es")), [tablesByZone]);
   const tableDepositPct = selected ? tableAdvancePct(selected) : 50;
 
   useEffect(() => {
@@ -185,20 +187,15 @@ export default function ReservarPage() {
     else setPaymentOption("partial");
   }, [selected?.id]);
 
-  useEffect(() => {
-    if (!selected) return;
-    const z = (selected.zone ?? "").trim() || "General";
-    setMobileZoneOpen((prev) => (prev[z] ? prev : { ...prev, [z]: true }));
-  }, [selected?.id]);
-
   const subtotal = selectedTableAmount + coverAmount;
-  const fee = Number((subtotal * 0.1).toFixed(2));
-  const total = Number((subtotal + fee).toFixed(2));
-  const payNow =
+  const totalCustomerContract = Number(subtotal.toFixed(2));
+  const localPayNowBase =
     paymentOption === "partial"
-      ? Number(((total * tableDepositPct) / 100).toFixed(2))
-      : total;
-  const pending = Number((total - payNow).toFixed(2));
+      ? Number(((subtotal * tableDepositPct) / 100).toFixed(2))
+      : subtotal;
+  const payNowCustomer = localPayNowBase;
+  const pendingLocalBase = Number((subtotal - localPayNowBase).toFixed(2));
+  const partialDepositCustomerPreview = Number(((subtotal * tableDepositPct) / 100).toFixed(2));
 
   async function handlePay() {
     setError(null);
@@ -206,6 +203,19 @@ export default function ReservarPage() {
     if (needsCover && !selectedCover) {
       setError("Selecciona el tipo de entrada cover.");
       return;
+    }
+    const token = getToken();
+    if (!token) {
+      const email = buyerEmail.trim().toLowerCase();
+      if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        setError("Indica un correo válido para tu reserva.");
+        return;
+      }
+      const name = buyerFullName.trim();
+      if (name.length < 2) {
+        setError("Indica tu nombre (mínimo 2 caracteres) para el titular de la reserva.");
+        return;
+      }
     }
     setLoading(true);
     try {
@@ -223,6 +233,12 @@ export default function ReservarPage() {
               unitPrice: Number(selectedCover.price),
             }
           : undefined,
+        ...(token
+          ? {}
+          : {
+              buyerEmail: buyerEmail.trim().toLowerCase(),
+              buyerFullName: buyerFullName.trim(),
+            }),
       });
       if (res.qrImage) setQrImage(res.qrImage);
       setBreakdown(res.breakdown);
@@ -236,20 +252,15 @@ export default function ReservarPage() {
     }
   }
 
-  function onContinueFromStep1() {
-    if (!selected) return;
-    if (needsCover) setStep(2);
-    else setStep(3);
-  }
-
-  const tableLayoutUrl = useMemo(
-    () => (event ? getReservationTableLayoutUrl(event) : null),
-    [event]
-  );
-  const layoutBackdropBg = useTableLayoutBackdrop(tableLayoutUrl);
-
   if (loadingEvent) {
-    return <div className="mx-auto max-w-4xl px-4 py-20 text-center text-slate-400">Cargando reserva...</div>;
+    return (
+      <div className={`relative min-h-[100dvh] w-full bg-black ${SITE_NAV_BLEED}`}>
+        <div className="absolute inset-0 z-0 bg-black" aria-hidden />
+        <div className="relative z-10 min-h-[85dvh]">
+          <PurchaseFlowEmbeddedCard title="Preparando tu reserva…" subtitle="Cargando evento y mesa" icon="table" />
+        </div>
+      </div>
+    );
   }
 
   if (!event) {
@@ -262,277 +273,154 @@ export default function ReservarPage() {
     );
   }
 
-  return (
-    <div className="mx-auto max-w-5xl px-4 py-6 md:px-6 md:py-12">
-      {/* En móvil: plano solo en paso 1 (bloque siguiente); aquí el encabezado completo (título, barra…) solo en md+ */}
-      <div className="hidden md:block">
-        {tableLayoutUrl && (
-          <div className="mb-8 md:mb-10">
-            <div
-              className="overflow-hidden rounded-2xl border border-white/10 shadow-lg shadow-black/40"
-              style={{ background: layoutBackdropBg }}
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={tableLayoutUrl}
-                alt={`Plano del local y mesas · ${event.title}`}
-                className="mx-auto max-h-[min(70vh,560px)] w-full object-contain"
-              />
-            </div>
-            <p className="mt-2 text-center text-xs text-slate-500">Plano del local — mismo archivo que en el panel (Mesas)</p>
-          </div>
-        )}
-        <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Reserva de mesa</p>
-        <h1 className="mt-2 text-3xl font-bold text-white">{event.title}</h1>
-        <p className="mt-2 text-sm text-slate-400">
-          {event.venue?.name} · {new Date(event.startAt).toLocaleString("es-DO")}
-        </p>
-        {event.venue?.id && (
-          <p className="mt-2">
+  if (tables.length === 0) {
+    return (
+      <ReservaEventBackdrop event={event}>
+        <div className="mx-auto max-w-lg px-4 py-16 text-center">
+          <div className={reservaGlassPanel}>
+            <p className="text-lg font-semibold text-white">Sin mesas publicadas</p>
+            <p className="mt-2 text-sm text-white/55">Este evento aún no tiene mesas para reservar.</p>
             <Link
-              href={`/collage?venueId=${encodeURIComponent(event.venue.id)}`}
-              className="text-sm font-medium text-[#9B7FCA] hover:underline"
+              href={`/e/${event.slug}`}
+              className="btn-primary mt-8 inline-flex items-center justify-center rounded-xl px-6 py-3 font-semibold"
             >
-              Ver recuerdos de eventos pasados en {event.venue.name} →
+              Volver al evento
             </Link>
-          </p>
-        )}
-
-        <div className="mt-6 h-2 w-full overflow-hidden rounded-full bg-night-800">
-          <div
-            className="h-full bg-gradient-to-r from-gozalo-blue to-gozalo-accent transition-all"
-            style={{ width: `${(step / 4) * 100}%` }}
-          />
-        </div>
-      </div>
-
-      {error && (
-        <div className="mt-0 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-100 max-md:mb-4 md:mt-5">
-          {error}
-        </div>
-      )}
-
-      {/* Móvil: plano completo (object-contain); fondo pergamino en letterboxing para que no se vean franjas negras */}
-      {!done && step === 1 && tableLayoutUrl && (
-        <div className="mb-4 md:hidden">
-          <div className="overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-b from-white/[0.07] to-night-950 p-[3px] shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] ring-1 ring-inset ring-white/[0.08]">
-            <div
-              className="flex min-h-[min(52vh,520px)] w-full items-center justify-center overflow-hidden rounded-[0.65rem] ring-1 ring-stone-700/20"
-              style={{ background: layoutBackdropBg }}
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={tableLayoutUrl}
-                alt={`Plano del local y mesas · ${event.title}`}
-                className="mx-auto h-auto max-h-[min(52vh,520px)] w-auto max-w-full object-contain object-center"
-              />
-            </div>
           </div>
         </div>
-      )}
+      </ReservaEventBackdrop>
+    );
+  }
 
-      {!done && step === 1 && (
-        <>
-          {/* Móvil: tarjetas por zona + lista de mesas (referencia tipo club; sin contador de personas) */}
-          <div className="mt-0 space-y-4 md:mt-8 md:hidden">
-            {tables.length === 0 ? (
-              <div className="rounded-2xl border border-amber-500/25 bg-amber-500/10 px-4 py-4 text-sm text-amber-100">
-                Aún no hay mesas publicadas para este evento. Vuelve más tarde o contacta al local.
+  if (!presetTableId) {
+    return (
+      <ReservaEventBackdrop event={event}>
+        <div className="mx-auto max-w-lg px-4 py-16 text-center">
+          <div className={reservaGlassPanel}>
+            <p className="text-lg font-semibold text-white">Elige tu mesa en la página del evento</p>
+            <p className="mt-2 text-sm text-white/55">
+              Abre el evento, selecciona zona y mesa; desde ahí entrarás directamente al pago de la reserva.
+            </p>
+            <Link
+              href={`/e/${event.slug}`}
+              className="btn-primary mt-8 inline-flex items-center justify-center rounded-xl px-6 py-3 font-semibold"
+            >
+              Ir al evento
+            </Link>
+          </div>
+        </div>
+      </ReservaEventBackdrop>
+    );
+  }
+
+  if (!selected) {
+    return (
+      <ReservaEventBackdrop event={event}>
+        <div className="mx-auto max-w-lg px-4 py-16 text-center">
+          <div className={reservaGlassPanel}>
+            <p className="text-lg font-semibold text-white">Mesa no disponible</p>
+            <p className="mt-2 text-sm text-white/55">
+              Esta mesa ya no está disponible o el enlace no es válido.
+            </p>
+            <Link
+              href={`/e/${event.slug}`}
+              className="btn-primary mt-8 inline-flex items-center justify-center rounded-xl px-6 py-3 font-semibold"
+            >
+              Elegir otra mesa
+            </Link>
+          </div>
+        </div>
+      </ReservaEventBackdrop>
+    );
+  }
+
+  if (step === null && !done) {
+    return (
+      <ReservaEventBackdrop event={event}>
+        <div className="mx-auto flex min-h-[70dvh] max-w-4xl justify-center px-4 py-12">
+          <PurchaseFlowEmbeddedCard title="Preparando tu reserva…" subtitle="Un momento" icon="table" />
+        </div>
+      </ReservaEventBackdrop>
+    );
+  }
+
+  const progressPct =
+    step === 4 ? 100 : step === 3 ? (needsCover ? 75 : 58) : step === 2 ? 33 : 0;
+
+  return (
+    <ReservaEventBackdrop event={event}>
+      <div className="mx-auto max-w-5xl px-4 py-6 md:px-6 md:py-12">
+        <div className={`mb-6 md:mb-8 ${reservaHeaderPanel}`}>
+          <div className="flex items-start gap-3 sm:gap-4">
+            {eventHeaderCoverSrc ? (
+              <div className="relative h-[4.25rem] w-[4.25rem] shrink-0 overflow-hidden rounded-xl border border-white/12 bg-black/35 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.06)] sm:h-[4.75rem] sm:w-[4.75rem]">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={eventHeaderCoverSrc}
+                  alt=""
+                  className="h-full w-full object-cover object-center"
+                />
               </div>
             ) : (
-              <div className="space-y-3">
-                {zoneOrder.map((zone) => {
-                  const zoneTables = tablesByZone.get(zone) ?? [];
-                  const minZ = minPriceInZone(zoneTables);
-                  const maxCap = Math.max(...zoneTables.map((t) => t.capacity), 1);
-                  const dot = zoneAccentClass(zone);
-                  const freeCount = zoneTables.filter(
-                    (x) => x.isAvailable !== false && x.estado !== "reservada"
-                  ).length;
-                  return (
-                    <details
-                      key={zone}
-                      className="group overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-b from-white/[0.07] to-night-900/90 shadow-lg shadow-black/30 open:border-white/15"
-                      open={mobileZoneOpen[zone] ?? false}
-                      onToggle={(e) => {
-                        const el =
-                          (e.target as HTMLDetailsElement | null) ??
-                          (e.currentTarget as HTMLDetailsElement | null);
-                        if (!el) return;
-                        setMobileZoneOpen((prev) => ({
-                          ...prev,
-                          [zone]: el.open,
-                        }));
-                      }}
-                    >
-                      <summary className="flex cursor-pointer list-none items-start gap-3 p-4 marker:content-none [&::-webkit-details-marker]:hidden">
-                        <span
-                          className="mt-0.5 h-3.5 w-3.5 shrink-0 rounded-full ring-2 ring-white/20"
-                          style={{ background: dot }}
-                          aria-hidden
-                        />
-                        <div className="min-w-0 flex-1">
-                          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500">Zona</p>
-                          <h3 className="text-lg font-bold uppercase tracking-wide text-white">{zone}</h3>
-                          <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-slate-300">
-                            <span className="font-semibold text-white">{formatMoney(minZ)}</span>
-                            <span className="text-slate-600">·</span>
-                            <span className="inline-flex items-center gap-1">
-                              hasta {maxCap} <IconUsersTiny className="text-slate-400" />
-                            </span>
-                            <span className="inline-flex max-w-full items-center rounded-full border border-gozalo-blue/45 bg-gozalo-blue/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-gozalo-blue">
-                              {zoneAdvanceLabel(zoneTables)}
-                            </span>
-                          </div>
-                          <p className="mt-1.5 text-xs text-slate-500">
-                            {zoneTables.length} mesa{zoneTables.length !== 1 ? "s" : ""}
-                            {freeCount > 0 ? (
-                              <span className="text-emerald-400/90"> · {freeCount} disponible{freeCount !== 1 ? "s" : ""}</span>
-                            ) : null}
-                          </p>
-                        </div>
-                        <div className="flex shrink-0 items-start pt-1">
-                          <IconChevronAccordion className="text-slate-400 transition duration-200 group-open:rotate-180" />
-                        </div>
-                      </summary>
-                      <div className="space-y-2 border-t border-white/10 p-3 pt-2">
-                        {zoneTables.map((t) => {
-                          const avail = t.isAvailable !== false && t.estado !== "reservada";
-                          const isSel = selected?.id === t.id;
-                          return (
-                            <button
-                              key={t.id}
-                              type="button"
-                              disabled={!avail}
-                              onClick={() => avail && setSelected(t)}
-                              className={[
-                                "flex w-full items-center justify-between gap-2 rounded-xl border px-3 py-3.5 text-left text-sm font-semibold transition",
-                                !avail
-                                  ? "cursor-not-allowed border-white/5 bg-white/[0.02] text-slate-500 opacity-60"
-                                  : isSel
-                                    ? "border-gozalo-blue/70 bg-gozalo-blue/15 text-white ring-1 ring-gozalo-blue/30"
-                                    : "border-white/10 bg-white/[0.04] text-white active:scale-[0.99] hover:border-white/20",
-                              ].join(" ")}
-                            >
-                              <span>{tableRowTitle(t)}</span>
-                              <span
-                                className={
-                                  !avail
-                                    ? "text-xs font-medium text-red-400/90"
-                                    : isSel
-                                      ? "text-xs font-bold text-gozalo-blue"
-                                      : "text-xs font-medium text-emerald-400/90"
-                                }
-                              >
-                                {!avail ? "Ocupada" : isSel ? "Seleccionada" : "Disponible"}
-                              </span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </details>
-                  );
-                })}
+              <div className="flex h-[4.25rem] w-[4.25rem] shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.05] text-sm font-semibold text-white/35 sm:h-[4.75rem] sm:w-[4.75rem]">
+                G
               </div>
             )}
-            {selected && (
-              <div className="rounded-2xl border border-white/10 bg-night-800/70 p-4 text-sm text-slate-300 ring-1 ring-inset ring-white/[0.06]">
-                <p className="font-semibold text-white">
-                  {selected.zone} · Mesa {selected.label}
+            <div className="min-w-0 flex-1 pt-0.5">
+              <p className="text-xs uppercase tracking-[0.18em] text-white/55">Reserva de mesa</p>
+              <h1 className="mt-1.5 text-2xl font-bold leading-tight text-white md:text-3xl">{event.title}</h1>
+              <p className="mt-2 text-sm text-white/55">
+                {event.venue?.name} · {new Date(event.startAt).toLocaleString("es-DO")}
+              </p>
+              {event.venue?.id ? (
+                <p className="mt-2 hidden md:block">
+                  <Link
+                    href={`/collage?venueId=${encodeURIComponent(event.venue.id)}`}
+                    className="text-sm font-medium text-amber-200/95 hover:underline"
+                  >
+                    Ver recuerdos de eventos pasados en {event.venue.name} →
+                  </Link>
                 </p>
-                <p className="mt-0.5 text-slate-400">Capacidad de la mesa: {selected.capacity} personas</p>
-                <p className="mt-0.5 text-white/90">Consumo mínimo: {formatMoney(selectedTableAmount)}</p>
-              </div>
-            )}
-            <button
-              type="button"
-              disabled={!selected}
-              onClick={onContinueFromStep1}
-              className={[
-                "w-full min-h-[50px] rounded-xl text-base font-semibold transition disabled:opacity-100",
-                selected ? "btn-primary shadow-md shadow-gozalo-blue/25" : "cursor-not-allowed border border-white/10 bg-white/[0.04] text-slate-500 ring-1 ring-inset ring-white/[0.05]",
-              ].join(" ")}
-            >
-              Continuar
-            </button>
-          </div>
-
-          {/* Escritorio: mapa con posiciones */}
-          <div className="mt-8 hidden md:block">
-            <div className="rounded-2xl border border-white/10 bg-night-900/60 p-6 ring-1 ring-inset ring-white/[0.06]">
-              <h2 className="text-xl font-semibold text-white">Paso 1 · Selección de mesa</h2>
-              <p className="mt-1 text-sm text-slate-500">Elige una mesa disponible en el plano.</p>
-              {tables.length === 0 ? (
-                <p className="mt-4 text-sm text-amber-200/90">No hay mesas publicadas aún.</p>
-              ) : (
-                <div className="relative mt-6 aspect-[4/3] rounded-xl border border-white/10 bg-night-950">
-                  {tables.map((t) => {
-                    const avail = t.isAvailable !== false && t.estado !== "reservada";
-                    return (
-                      <button
-                        key={t.id}
-                        type="button"
-                        disabled={!avail}
-                        onClick={() => avail && setSelected(t)}
-                        className={`absolute flex h-12 w-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-lg border text-xs font-semibold transition ${
-                          !avail
-                            ? "cursor-not-allowed border-red-500/60 bg-red-950/50 text-red-200 opacity-80"
-                            : selected?.id === t.id
-                              ? "border-gozalo-blue bg-gozalo-blue/20 text-gozalo-blue shadow-neonBlue"
-                              : "border-emerald-500/50 bg-emerald-950/40 text-emerald-300"
-                        }`}
-                        style={{ left: `${t.posX}%`, top: `${t.posY}%` }}
-                      >
-                        {t.label}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-              {selected && (
-                <div className="mt-4 rounded-xl border border-white/10 bg-night-800/60 p-4 text-sm text-slate-300">
-                  <p className="font-semibold text-white">
-                    Mesa {selected.zone} - {selected.label}
-                  </p>
-                  <p>Capacidad: {selected.capacity} personas</p>
-                  <p>Consumo mínimo: {formatMoney(selectedTableAmount)}</p>
-                </div>
-              )}
-              <button
-                type="button"
-                disabled={!selected}
-                onClick={onContinueFromStep1}
-                className="btn-primary mt-6 disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                Continuar
-              </button>
+              ) : null}
             </div>
           </div>
-        </>
-      )}
 
-      {!done && step === 2 && (
-        <div className="mt-8 max-md:mt-4 rounded-2xl border border-white/10 bg-night-900/60 p-6 ring-1 ring-inset ring-white/[0.06]">
-          <h2 className="text-lg font-semibold leading-tight text-white md:text-xl">Paso 2 · Cover</h2>
-          <p className="mt-1 text-sm text-slate-500">
-            Este evento requiere cover para reservar mesa. Selecciona tipo de entrada.
-          </p>
-          <div className="mt-4 space-y-3">
-            {ticketTypes.map((t) => {
-              const id = t.id ?? t.name;
-              return (
-                <button
-                  key={id}
-                  type="button"
-                  onClick={() => setSelectedCoverId(id)}
-                  className={`flex w-full items-center justify-between rounded-xl border px-4 py-3 text-left ${
-                    selectedCoverId === id
-                      ? "border-gozalo-blue bg-gozalo-blue/10"
-                      : "border-white/10 bg-night-800/60 hover:border-white/20"
-                  }`}
-                >
+          <div className="mt-6 h-2 w-full overflow-hidden rounded-full bg-white/[0.08]">
+            <div
+              className="h-full bg-gradient-to-r from-white/25 via-white/50 to-white/30 transition-all duration-300"
+              style={{ width: `${progressPct}%` }}
+            />
+          </div>
+        </div>
+
+        {error && (
+          <div className="mt-0 rounded-xl border border-red-500/30 bg-red-500/15 px-4 py-3 text-sm text-red-100 backdrop-blur-md max-md:mb-4 md:mt-5">
+            {error}
+          </div>
+        )}
+
+        {!done && step === 2 && (
+          <div className={`mt-8 max-md:mt-4 p-6 ${reservaGlassCard}`}>
+            <h2 className="text-lg font-semibold leading-tight text-white md:text-xl">Cover obligatorio</h2>
+            <p className="mt-1 text-sm text-white/50">
+              Este evento requiere cover para reservar mesa. Selecciona tipo de entrada.
+            </p>
+            <div className="mt-4 space-y-3">
+              {ticketTypes.map((t) => {
+                const id = t.id ?? t.name;
+                return (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => setSelectedCoverId(id)}
+                    className={`flex w-full items-center justify-between rounded-xl border px-4 py-3 text-left transition ${
+                      selectedCoverId === id
+                        ? "border-[#C77DFF] bg-[#C77DFF]/12 ring-1 ring-inset ring-[#C77DFF]/25"
+                        : "border-white/[0.12] bg-white/[0.05] hover:border-white/20 hover:bg-white/[0.08]"
+                    }`}
+                  >
                   <span className="text-white">{t.name}</span>
-                  <span className="font-semibold text-gozalo-blue">{formatMoney(Number(t.price))}</span>
+                  <span className="font-semibold text-[#E9D5FF]">{formatMoney(Number(t.price))}</span>
                 </button>
               );
             })}
@@ -540,7 +428,7 @@ export default function ReservarPage() {
           <div className="mt-6 grid grid-cols-2 gap-3">
             <button
               type="button"
-              onClick={() => setStep(1)}
+              onClick={() => router.push(`/e/${event.slug}`)}
               className="inline-flex min-h-[48px] w-full items-center justify-center rounded-xl border border-white/10 bg-white/[0.02] px-2 py-2.5 text-sm font-semibold text-white ring-1 ring-inset ring-white/[0.06] transition hover:border-white/15 hover:bg-white/[0.06] sm:px-4"
             >
               Atrás
@@ -557,13 +445,11 @@ export default function ReservarPage() {
         </div>
       )}
 
-      {!done && step === 3 && (
-        <div
-          className={`mt-8 max-md:mt-4 rounded-2xl border border-white/10 bg-night-900/60 p-5 ring-1 ring-inset ring-white/[0.06] sm:p-6 ${siteCheckoutFiguresSansClass}`}
-        >
+        {!done && step === 3 && (
+          <div className={`mt-8 max-md:mt-4 p-5 sm:p-6 ${reservaGlassCard} ${siteCheckoutFiguresSansClass}`}>
           <div className="mx-auto flex max-w-lg flex-col items-center text-center sm:max-w-none sm:items-stretch sm:text-left">
             <span className="inline-flex rounded-full border border-white/10 bg-white/[0.06] px-2.5 py-1.5 text-[10px] font-normal uppercase tracking-wider text-white/75">
-              Paso 3 de 4
+              {needsCover ? "Paso 2 · Pago" : "Checkout"}
             </span>
             <div className="mt-1.5 max-w-sm font-sans text-xs leading-relaxed text-white/55 sm:max-w-none sm:text-[13px] md:text-[14px] md:leading-snug">
               {tableDepositPct >= 100 ? (
@@ -588,43 +474,47 @@ export default function ReservarPage() {
               type="button"
               onClick={() => setPaymentOption("total")}
               className={[
-                "flex min-h-[48px] w-full items-center justify-center rounded-xl border px-4 py-3 text-center transition",
+                "flex min-h-[44px] w-full items-center justify-center rounded-xl border px-3 py-2.5 text-center font-sans transition",
+                "text-[13px] font-medium leading-snug tracking-tight text-white/90 sm:text-sm",
                 paymentOption === "total"
-                  ? "border-gozalo-blue bg-gozalo-blue/10 text-gozalo-blue ring-1 ring-inset ring-gozalo-blue/20"
-                  : "border-white/10 bg-night-800/60 text-white hover:border-white/20",
-                siteBodyTextClass,
+                  ? "border-[#C77DFF] bg-[#C77DFF]/12 text-[#F3E8FF] ring-1 ring-inset ring-[#C77DFF]/30"
+                  : "border-white/[0.12] bg-white/[0.06] hover:border-white/22 hover:bg-white/[0.09]",
               ].join(" ")}
             >
-              Pagar total ({formatMoney(total)})
+              <span className="tabular-nums">
+                Pagar total ({formatMoney(totalCustomerContract)})
+              </span>
             </button>
             {tableDepositPct < 100 && (
               <button
                 type="button"
                 onClick={() => setPaymentOption("partial")}
                 className={[
-                  "flex min-h-[48px] w-full items-center justify-center rounded-xl border px-4 py-3 text-center transition",
+                  "flex min-h-[44px] w-full items-center justify-center rounded-xl border px-3 py-2.5 text-center font-sans transition",
+                  "text-[13px] font-medium leading-snug tracking-tight text-white/90 sm:text-sm",
                   paymentOption === "partial"
-                    ? "border-gozalo-blue bg-gozalo-blue/10 text-gozalo-blue ring-1 ring-inset ring-gozalo-blue/20"
-                    : "border-white/10 bg-night-800/60 text-white hover:border-white/20",
-                  siteBodyTextClass,
+                    ? "border-[#C77DFF] bg-[#C77DFF]/12 text-[#F3E8FF] ring-1 ring-inset ring-[#C77DFF]/30"
+                    : "border-white/[0.12] bg-white/[0.06] hover:border-white/22 hover:bg-white/[0.09]",
                 ].join(" ")}
               >
-                Adelanto {tableDepositPct}% ({formatMoney(Number(((total * tableDepositPct) / 100).toFixed(2)))})
+                <span className="tabular-nums">
+                  Adelanto {tableDepositPct}% ({formatMoney(partialDepositCustomerPreview)})
+                </span>
               </button>
             )}
           </div>
 
           {paymentOption === "partial" && tableDepositPct < 100 && (
             <p
-              className={`mt-4 rounded-xl border border-white/[0.07] bg-[#07070d]/80 px-3.5 py-3 ring-1 ring-inset ring-white/[0.04] ${siteBodyMutedClass}`}
+              className={`mt-4 rounded-xl px-3 py-2.5 font-sans text-[12px] font-normal leading-snug text-white/55 sm:text-[13px] ${reservaGlassInset}`}
             >
-              Pagas ahora el <strong className="font-semibold text-white/90">{tableDepositPct}%</strong> fijado por el local; el resto lo
+              Pagas ahora el <strong className="font-semibold text-white/82">{tableDepositPct}%</strong> fijado por el local; el resto lo
               liquidas en el evento.
             </p>
           )}
 
           <div
-            className={`mt-5 flex min-h-0 flex-col overflow-hidden rounded-xl border border-white/[0.07] bg-[#07070d]/95 font-normal text-white/75 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] ${siteCheckoutSummaryRowsClass}`}
+            className={`mt-5 flex min-h-0 flex-col overflow-hidden rounded-xl font-normal text-white/75 ${reservaGlassInset} ${siteCheckoutSummaryRowsClass}`}
           >
             <div className="border-b border-white/[0.07] px-3.5 py-2.5 font-sans text-[10px] font-normal uppercase tracking-[0.16em] text-white/42">
               Desglose
@@ -662,43 +552,75 @@ export default function ReservarPage() {
                 <span>Subtotal</span>
                 <span className="tabular-nums text-white/88">{formatMoney(subtotal)}</span>
               </div>
-              <div className="flex items-center justify-between gap-6 px-3.5 py-2.5 text-white/70">
-                <span className="min-w-0 leading-snug">Gastos de gestión (10&nbsp;%)</span>
-                <span className="tabular-nums text-white/88">{formatMoney(fee)}</span>
-              </div>
             </div>
 
             <div className="flex items-center justify-between gap-6 border-t border-white/[0.1] bg-white/[0.04] px-3.5 py-3 font-sans text-[13px] text-white sm:text-[14px] md:text-[15px]">
               <span className="font-medium tracking-wide">Total</span>
-              <span className="tabular-nums font-semibold tracking-wide">{formatMoney(total)}</span>
+              <span className="tabular-nums font-semibold tracking-wide">{formatMoney(totalCustomerContract)}</span>
             </div>
 
             <div className="border-t border-white/[0.07]">
               <div className="flex items-center justify-between gap-6 px-3.5 py-2.5 text-white/70">
                 <span>Pago ahora</span>
-                <span className={siteCheckoutSummaryAmountCellClass}>{formatMoney(payNow)}</span>
+                <span className={siteCheckoutSummaryAmountCellClass}>{formatMoney(payNowCustomer)}</span>
               </div>
-              {pending > 0 && (
+              {pendingLocalBase > 0 && (
                 <div className="flex items-center justify-between gap-6 border-t border-white/[0.06] px-3.5 py-2.5 text-[#D4C2EE]/90">
-                  <span>Pendiente en local</span>
-                  <span className="tabular-nums font-medium">{formatMoney(pending)}</span>
+                  <span>Pendiente en el local</span>
+                  <span className="tabular-nums font-medium">{formatMoney(pendingLocalBase)}</span>
                 </div>
               )}
             </div>
           </div>
+
+          {!getToken() ? (
+            <div className={`mt-5 w-full max-w-md space-y-3 text-left sm:mx-auto ${siteBodyTextClass}`}>
+              <p className={`text-[13px] ${siteBodyMutedClass}`}>
+                Sin iniciar sesión usamos tu correo para la confirmación y asociamos la reserva a una cuenta cliente.
+              </p>
+              <div>
+                <label htmlFor="reserva-buyer-email" className="mb-1.5 block text-[11px] font-medium uppercase tracking-wider text-white/50">
+                  Correo electrónico
+                </label>
+                <input
+                  id="reserva-buyer-email"
+                  type="email"
+                  autoComplete="email"
+                  value={buyerEmail}
+                  onChange={(e) => setBuyerEmail(e.target.value)}
+                  placeholder="tu@correo.com"
+                  className="w-full rounded-xl border border-white/[0.12] bg-black/40 px-3.5 py-2.5 text-[15px] text-white placeholder:text-white/30 focus:border-white/25 focus:outline-none focus:ring-1 focus:ring-white/20"
+                />
+              </div>
+              <div>
+                <label htmlFor="reserva-buyer-name" className="mb-1.5 block text-[11px] font-medium uppercase tracking-wider text-white/50">
+                  Nombre completo
+                </label>
+                <input
+                  id="reserva-buyer-name"
+                  type="text"
+                  autoComplete="name"
+                  value={buyerFullName}
+                  onChange={(e) => setBuyerFullName(e.target.value)}
+                  placeholder="Titular de la reserva"
+                  className="w-full rounded-xl border border-white/[0.12] bg-black/40 px-3.5 py-2.5 text-[15px] text-white placeholder:text-white/30 focus:border-white/25 focus:outline-none focus:ring-1 focus:ring-white/20"
+                />
+              </div>
+            </div>
+          ) : null}
 
           <textarea
             placeholder="Notas adicionales (opcional)"
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             rows={3}
-            className={`mt-5 w-full rounded-xl border border-white/10 bg-night-900 px-3.5 py-3 ring-1 ring-inset ring-white/[0.06] placeholder:text-white/40 ${siteBodyTextClass}`}
+            className={`mt-5 w-full rounded-xl border border-white/[0.12] bg-black/30 px-3.5 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] backdrop-blur-md placeholder:text-white/40 ${siteBodyTextClass}`}
           />
 
           <div className="mt-6 grid w-full min-w-0 grid-cols-2 gap-3 sm:gap-3.5">
             <button
               type="button"
-              onClick={() => setStep(needsCover ? 2 : 1)}
+              onClick={() => (needsCover ? setStep(2) : router.push(`/e/${event.slug}`))}
               className={`inline-flex min-h-[50px] min-w-0 w-full max-w-full items-center justify-center rounded-xl border border-white/10 bg-white/[0.02] px-1.5 py-2.5 text-center font-normal text-white ring-1 ring-inset ring-white/[0.06] transition hover:border-white/15 hover:bg-white/[0.06] sm:px-3 ${siteBodyTextClass}`}
             >
               Atrás
@@ -715,8 +637,8 @@ export default function ReservarPage() {
         </div>
       )}
 
-      {done && step === 4 && (
-        <div className="mt-8 max-md:mt-4 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-6">
+        {done && step === 4 && (
+          <div className={`mt-8 max-md:mt-4 border-emerald-400/35 p-6 ${reservaGlassCard} shadow-[inset_0_0_0_1px_rgba(52,211,153,0.2)]`}>
           <h2 className="text-2xl font-semibold text-emerald-200">Reserva confirmada</h2>
           <p className="mt-2 text-sm text-emerald-100">
             Tu reserva fue creada exitosamente. El QR fue enviado por email.
@@ -735,8 +657,8 @@ export default function ReservarPage() {
               Mesa: {selected?.zone} - {selected?.label}
             </p>
             <p>Personas: {partySize}</p>
-            <p>Monto pagado: {formatMoney(breakdown?.payNow ?? payNow)}</p>
-            <p>Pendiente: {formatMoney(breakdown?.pendingAtVenue ?? pending)}</p>
+            <p>Monto pagado (tarjeta): {formatMoney(breakdown?.payNowCustomer ?? breakdown?.payNow ?? payNowCustomer)}</p>
+            <p>Pendiente en el local: {formatMoney(breakdown?.pendingLocalBase ?? breakdown?.pendingAtVenue ?? pendingLocalBase)}</p>
             {reservationId && <p>ID reserva: {reservationId}</p>}
           </div>
           <div className="mt-6 flex flex-wrap gap-3">
@@ -744,7 +666,7 @@ export default function ReservarPage() {
               Ver mis mesas
             </Link>
             <Link
-              href={`/eventos/${event.slug}`}
+              href={`/e/${event.slug}`}
               className="rounded-xl border border-white/10 bg-white/[0.02] px-4 py-2 text-sm font-semibold text-white ring-1 ring-inset ring-white/[0.06] transition hover:border-white/15 hover:bg-white/[0.06]"
             >
               Volver al evento
@@ -753,11 +675,27 @@ export default function ReservarPage() {
         </div>
       )}
 
-      <p className="mt-8 text-center text-sm text-slate-500">
-        <Link href="/eventos" className="text-gozalo-blue hover:underline">
-          Volver a eventos
-        </Link>
-      </p>
-    </div>
+        <p className="mt-8 text-center text-sm text-white/50">
+          <Link href="/eventos" className="text-amber-200/85 underline-offset-2 hover:text-amber-100 hover:underline">
+            Volver a eventos
+          </Link>
+        </p>
+      </div>
+    </ReservaEventBackdrop>
+  );
+}
+
+export default function ReservarPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen flex-col items-center justify-center bg-[#0a0a0f] px-4">
+          <div className="h-10 w-10 animate-pulse rounded-2xl bg-white/10" />
+          <p className="mt-4 text-sm text-white/45">Cargando reserva…</p>
+        </div>
+      }
+    >
+      <ReservarPageInner />
+    </Suspense>
   );
 }

@@ -50,6 +50,38 @@ function rangesNow(anchor = new Date()) {
   };
 }
 
+/**
+ * Panel Ventas (móvil): HOY, últimos 7 días calendario (hoy incluido), mes natural,
+ * y ventanas de comparación para tendencias.
+ */
+function rangesSalesPanelMobile(anchor = new Date()) {
+  const todayStart = startOfDay(anchor);
+  const todayEnd = endOfDay(anchor);
+
+  const yesterdayStart = startOfDay(addDays(anchor, -1));
+  const yesterdayEnd = endOfDay(addDays(anchor, -1));
+
+  const week7Start = startOfDay(addDays(anchor, -6));
+  const week7End = endOfDay(anchor);
+  const prevWeek7Start = startOfDay(addDays(anchor, -13));
+  const prevWeek7End = endOfDay(addDays(anchor, -7));
+
+  /* "Mes" del panel móvil = últimos 30 días (rolling window). */
+  const monthStart = startOfDay(addDays(anchor, -29));
+  const monthEnd = endOfDay(anchor);
+  const prevMonthStart = startOfDay(addDays(anchor, -59));
+  const prevMonthEnd = endOfDay(addDays(anchor, -30));
+
+  return {
+    today: { start: todayStart, end: todayEnd },
+    prevToday: { start: yesterdayStart, end: yesterdayEnd },
+    week7: { start: week7Start, end: week7End },
+    prevWeek7: { start: prevWeek7Start, end: prevWeek7End },
+    month: { start: monthStart, end: monthEnd },
+    prevMonth: { start: prevMonthStart, end: prevMonthEnd },
+  };
+}
+
 function pctChange(current, previous) {
   const c = Number(current) || 0;
   const p = Number(previous) || 0;
@@ -92,11 +124,11 @@ function normalizeTicketStatus(raw) {
   return TICKET_STATUS_ALIASES[s] || s;
 }
 
-/** Para filtros WHERE: pagado incluye legacy 'valid' */
+/** Para filtros WHERE: pagado incluye tickets vendidos y/o ya usados. */
 function ticketStatusWhere(status) {
   if (!status) return null;
   if (status === 'paid' || status === 'pagado') {
-    return { [Op.in]: ['paid', 'valid'] };
+    return { [Op.in]: ['paid', 'valid', 'used'] };
   }
   return status;
 }
@@ -106,6 +138,7 @@ module.exports = {
   endOfDay,
   addDays,
   rangesNow,
+  rangesSalesPanelMobile,
   pctChange,
   parsePage,
   normalizeReservationStatus,

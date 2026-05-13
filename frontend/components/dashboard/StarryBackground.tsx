@@ -2,6 +2,7 @@
 
 import type { CSSProperties } from "react";
 import { useMemo } from "react";
+import { ShootingStarsLayer } from "@/components/dashboard/desktop/ShootingStarsLayer";
 
 const STAR_COUNT = 100;
 
@@ -42,18 +43,21 @@ function buildStars(): StarSpec[] {
 }
 
 /**
- * Cielo estrellado sobre negro puro. Solo &lt;768px.
- * `prefers-reduced-motion`: `.starry-twinkle` en globals.css.
+ * Cielo estrellado sobre negro puro.
+ * - `mobile`: solo &lt;768px (dashboard móvil).
+ * - `desktop`: solo ≥768px (panel dueño desktop), con estrellas fugaces.
+ * `prefers-reduced-motion`: `.starry-twinkle` y `.shooting-star-anim` en globals.css.
  *
  * Nota: `z-0` (no negativo) para que las estrellas no queden detrás del fondo de `body`.
  */
-export function StarryBackground() {
+export function StarryBackground({ variant = "mobile" }: { variant?: "mobile" | "desktop" }) {
   const stars = useMemo(buildStars, []);
+  const visibility = variant === "mobile" ? "md:hidden" : "hidden md:block";
 
   return (
     <div
       aria-hidden
-      className="pointer-events-none fixed inset-0 z-0 md:hidden overflow-hidden bg-[#000000]"
+      className={`pointer-events-none fixed inset-0 z-0 overflow-hidden bg-[#000000] ${visibility}`}
     >
       {stars.map((s, i) => {
         const halo =
@@ -87,6 +91,7 @@ export function StarryBackground() {
           />
         );
       })}
+      {variant === "desktop" ? <ShootingStarsLayer /> : null}
     </div>
   );
 }

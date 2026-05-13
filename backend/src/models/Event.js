@@ -49,6 +49,13 @@ const Event = sequelize.define(
     /** Si este evento fue generado por una plantilla, apunta al id del padre. */
     recurrenceParentId: { type: DataTypes.UUID, allowNull: true },
 
+    /** `parallel`: todos los tipos activos a la vez. `sequential`: cola por `sort_order` en tipos de ticket. */
+    ticketSaleMode: {
+      type: DataTypes.STRING(20),
+      allowNull: false,
+      defaultValue: 'parallel',
+    },
+
     // ── Oleada 3: Rider técnico + setlist ──────────────────────────────────
     /** Array de URLs de archivos del rider técnico (PDF, imágenes) */
     riderFiles: { type: DataTypes.JSON, allowNull: true },
@@ -60,6 +67,9 @@ const Event = sequelize.define(
     // ── Oleada 3: Chat / WhatsApp del staff ────────────────────────────────
     /** Link de grupo WhatsApp del staff para este evento */
     staffWhatsappLink: { type: DataTypes.STRING, allowNull: true },
+
+    /** Metadatos del asistente móvil (ubicación, políticas, toggles no cubiertos por columnas) */
+    wizardMeta: { type: DataTypes.JSON, allowNull: true },
   },
   {
     tableName: 'events',

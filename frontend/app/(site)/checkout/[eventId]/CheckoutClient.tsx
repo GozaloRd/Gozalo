@@ -2,15 +2,16 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { getToken } from "@/lib/api";
 import { purchaseTickets, type PurchasedTicket } from "@/lib/customerApi";
-import type { EventImageFooterTheme } from "@/lib/eventFooterTheme";
 import { EventTicketPassCard } from "@/components/site/EventTicketPassCard";
 import { getEventCoverImageUrl } from "@/lib/eventCoverImage";
+import { getPublicImageAbsoluteUrl } from "@/lib/publicImageUrl";
+import { PurchaseFlowEmbeddedCard } from "@/components/public-event/PurchaseFlowTransition";
 import { fetchPublicEventById, type PublicEventDetail } from "@/lib/publicApi";
 import { formatDate, formatMoney } from "@/lib/format";
-import { useEventImageFooterColor } from "@/hooks/useEventImageFooterColor";
+import { canPurchaseType, orderedTypes, type TicketTypeInput } from "@/lib/ticketQueueLogic";
 import {
   siteBodyMutedClass,
   siteBodyTextClass,
@@ -23,37 +24,44 @@ import {
   siteSectionTitleClass,
 } from "@/lib/siteTypography";
 
-type Step = 1 | 2 | 3 | 4;
+/** Misma capa que `/e/[eventId]`: flyer difuminado + overlay oscuro */
+const CHECKOUT_BLUR_OVERLAY: CSSProperties = {
+  background: `linear-gradient(
+    180deg,
+    rgba(0,0,0,0.15) 0%,
+    rgba(0,0,0,0.20) 40%,
+    rgba(0,0,0,0.75) 70%,
+    rgba(0,0,0,0.95) 100%
+  )`,
+};
 
-function IconCheckCircle({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      width={22}
-      height={22}
-      viewBox="0 0 24 24"
-      fill="none"
-      aria-hidden
-    >
-      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.5" className="text-[#9B7FCA]/90" />
-      <path d="M8 12l2.5 2.5L16 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-gozalo-blue" />
-    </svg>
-  );
-}
+/** Misma altura que el spacer del `Navbar` en (site): el fondo sube bajo la barra transparente. */
+const SITE_NAV_BLEED =
+  "-mt-[4.25rem] pt-[4.25rem] md:-mt-[4.5rem] md:pt-[4.5rem]";
+
+/** Paneles principales: vidrio + blur (misma línea que `/e/...`) */
+const checkoutGlassCard =
+  "border border-white/[0.13] bg-gradient-to-b from-white/[0.1] to-white/[0.04] shadow-[0_32px_80px_-20px_rgba(0,0,0,0.72)] backdrop-blur-[28px]";
+const checkoutGlassInset =
+  "border border-white/[0.12] bg-black/35 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-xl";
+
+/** Cabecera con foto: misma línea que reserva de mesa (`reservaHeaderPanel`). */
+const checkoutHeaderPanel =
+  "rounded-[28px] border border-white/[0.09] bg-white/[0.05] p-5 shadow-[0_24px_64px_-28px_rgba(0,0,0,0.55)] backdrop-blur-[22px]";
+
+/** Cantidad / resumen → Pago → Confirmación (la elección del tipo es solo en `/e/...`) */
+type Step = 1 | 2 | 3;
 
 type CheckoutClientProps = {
   eventId: string;
-  /** Imagen usada para el color de fondo (misma lógica que el API); puede venir del SSR. */
+  /** Cover para fondo (SSR + cliente); misma URL que la página pública del evento */
   initialCoverForTheme?: string | null;
-  serverFooterTheme?: EventImageFooterTheme | null;
 };
 
 export function CheckoutClient({
   eventId,
   initialCoverForTheme = null,
-  serverFooterTheme: serverFooterThemeProp = null,
 }: CheckoutClientProps) {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const [event, setEvent] = useState<PublicEventDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -63,15 +71,19 @@ export function CheckoutClient({
   const [qty, setQty] = useState(1);
   const [paying, setPaying] = useState(false);
   const [result, setResult] = useState<{ orderId: string; tickets: PurchasedTicket[] } | null>(null);
-  const requestedTicketTypeId = searchParams.get("ticketTypeId");
+  /** Invitado: datos para crear/enlazar usuario en el servidor al pagar. */
+  const [buyerEmail, setBuyerEmail] = useState("");
+  const [buyerFullName, setBuyerFullName] = useState("");
+  /** `ticket` = enlace desde página del evento `/e/...`; `ticketTypeId` = alias explícito */
+  const ticketFromUrl =
+    searchParams?.get("ticketTypeId") ?? searchParams?.get("ticket") ?? "";
+  const [prefDone, setPrefDone] = useState(() => !ticketFromUrl);
 
   useEffect(() => {
-    const token = getToken();
-    if (!token) {
-      router.replace(`/login?next=${encodeURIComponent(`/checkout/${eventId}`)}`);
-      return;
-    }
+    setPrefDone(!ticketFromUrl);
+  }, [ticketFromUrl]);
 
+  useEffect(() => {
     let active = true;
     void (async () => {
       try {
@@ -79,12 +91,14 @@ export function CheckoutClient({
         if (!active) return;
         if (!data) {
           setError("No se pudo cargar el evento.");
+          setPrefDone(true);
           return;
         }
         setEvent(data);
       } catch {
         if (!active) return;
         setError("Error al cargar el checkout.");
+        setPrefDone(true);
       } finally {
         if (active) setLoading(false);
       }
@@ -92,69 +106,102 @@ export function CheckoutClient({
     return () => {
       active = false;
     };
-  }, [eventId, router]);
+  }, [eventId]);
 
-  const ticketTypes = useMemo(
-    () => (event?.ticketTypes ?? []).filter((t) => t.active !== false),
-    [event]
-  );
+  const ticketTypesOrdered = useMemo((): TicketTypeInput[] => {
+    const raw = event?.ticketTypes ?? [];
+    const mapped = raw.map((t, idx) => ({
+      id: String(t.id ?? t.name),
+      name: t.name,
+      price: t.price,
+      quantityTotal: t.quantityTotal ?? null,
+      soldCount: t.soldCount ?? 0,
+      active: t.active,
+      sortOrder: t.sortOrder ?? idx,
+    }));
+    return orderedTypes(mapped);
+  }, [event]);
 
   const selectedType = useMemo(
-    () => ticketTypes.find((t) => (t.id ?? t.name) === selectedTypeId) ?? null,
-    [ticketTypes, selectedTypeId]
+    () => ticketTypesOrdered.find((t) => t.id === selectedTypeId) ?? null,
+    [ticketTypesOrdered, selectedTypeId]
   );
 
   useEffect(() => {
-    if (ticketTypes.length === 0) return;
-    const isCurrentValid = selectedTypeId
-      ? ticketTypes.some((t) => (t.id ?? t.name) === selectedTypeId)
-      : false;
-    if (isCurrentValid) return;
-    if (!requestedTicketTypeId) return;
-    const matched = ticketTypes.find((t) => (t.id ?? t.name) === requestedTicketTypeId);
-    if (!matched) return;
-    setSelectedTypeId(requestedTicketTypeId);
-    setStep(2);
-  }, [requestedTicketTypeId, selectedTypeId, ticketTypes]);
+    if (!event) return;
+    if (ticketTypesOrdered.length === 0) {
+      setPrefDone(true);
+      return;
+    }
+
+    const tid = ticketFromUrl || null;
+    const isCurrentValid =
+      selectedTypeId != null && ticketTypesOrdered.some((t) => t.id === selectedTypeId);
+
+    if (isCurrentValid) {
+      setPrefDone(true);
+      return;
+    }
+
+    if (!tid) {
+      setPrefDone(true);
+      return;
+    }
+
+    const matched = ticketTypesOrdered.find((t) => t.id === tid);
+    if (!matched || !canPurchaseType(event.ticketSaleMode, matched, ticketTypesOrdered)) {
+      setPrefDone(true);
+      return;
+    }
+
+    setSelectedTypeId(tid);
+    setStep(1);
+    setPrefDone(true);
+  }, [event, event?.ticketSaleMode, ticketFromUrl, selectedTypeId, ticketTypesOrdered]);
 
   const unitPrice = selectedType ? Number(selectedType.price) : 0;
   const subtotal = unitPrice * qty;
-  const fee = Number((subtotal * 0.1).toFixed(2));
-  const total = Number((subtotal + fee).toFixed(2));
-  const available = selectedType?.quantityTotal ?? null;
-  const showQuantityToPublic = selectedType?.showQuantityPublic !== false;
-
-  const coverUrl = useMemo(
-    () => (event ? getEventCoverImageUrl(event) : null),
-    [event]
+  const total = Number(subtotal.toFixed(2));
+  const remainingForSelected =
+    selectedType?.quantityTotal != null && selectedType.quantityTotal > 0
+      ? Math.max(0, Number(selectedType.quantityTotal) - (selectedType.soldCount ?? 0))
+      : null;
+  const rawSelectedType = useMemo(
+    () => (event?.ticketTypes ?? []).find((x) => String(x.id ?? x.name) === selectedType?.id),
+    [event?.ticketTypes, selectedType?.id]
   );
+  const showQuantityToPublic = rawSelectedType?.showQuantityPublic !== false;
 
   const coverForTheme = useMemo(
     () => (event ? getEventCoverImageUrl(event) : initialCoverForTheme),
     [event, initialCoverForTheme]
   );
 
-  const imageTheme = useEventImageFooterColor(
-    coverForTheme,
-    Boolean(coverForTheme),
-    serverFooterThemeProp ?? undefined
-  );
-
-  const checkoutPageBackground = useMemo((): CSSProperties => {
-    const c = imageTheme.footerBg;
-    return {
-      background: [
-        `radial-gradient(ellipse 100% 75% at 50% -15%, color-mix(in srgb, ${c} 52%, #0a0a12) 0%, transparent 58%)`,
-        `linear-gradient(180deg, color-mix(in srgb, ${c} 22%, #060608) 0%, #040406 38%, #020203 100%)`,
-      ].join(", "),
-    };
-  }, [imageTheme.footerBg]);
+  const eventHeaderCoverSrc = useMemo(() => {
+    if (!event) return null;
+    const raw = getEventCoverImageUrl(event);
+    return raw ? getPublicImageAbsoluteUrl(raw) : null;
+  }, [event]);
 
   async function doPay() {
     if (!event || !selectedType) return;
-    if (available != null && qty > available) {
-      setError(`Solo hay ${available} entrada(s) disponible(s) para este tipo.`);
+    if (remainingForSelected != null && qty > remainingForSelected) {
+      setError(`Solo hay ${remainingForSelected} ticket(s) disponible(s) para este tipo.`);
       return;
+    }
+
+    const token = getToken();
+    if (!token) {
+      const email = buyerEmail.trim().toLowerCase();
+      if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        setError("Indica un correo válido para recibir tus entradas.");
+        return;
+      }
+      const name = buyerFullName.trim();
+      if (name.length < 2) {
+        setError("Indica tu nombre (mínimo 2 caracteres) para el titular de la compra.");
+        return;
+      }
     }
 
     setError(null);
@@ -163,9 +210,15 @@ export function CheckoutClient({
       const data = await purchaseTickets({
         eventId: event.id,
         items: [{ ticketType: selectedType.name, quantity: qty, unitPrice }],
+        ...(token
+          ? {}
+          : {
+              buyerEmail: buyerEmail.trim().toLowerCase(),
+              buyerFullName: buyerFullName.trim(),
+            }),
       });
       setResult({ orderId: data.order.id, tickets: data.tickets });
-      setStep(4);
+      setStep(3);
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo completar el pago.");
     } finally {
@@ -174,77 +227,141 @@ export function CheckoutClient({
   }
 
   const checkoutBackdrop = (
-    <div
-      className="pointer-events-none fixed inset-0 -z-10 min-h-[100dvh] w-full"
-      style={checkoutPageBackground}
-      aria-hidden
-    />
+    <>
+      {coverForTheme ? (
+        <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden" aria-hidden>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={coverForTheme}
+            alt=""
+            className="absolute inset-0 h-full w-full"
+            style={{
+              objectFit: "cover",
+              objectPosition: "center top",
+              filter: "blur(40px) brightness(0.35) saturate(1.4)",
+              transform: "scale(1.1)",
+            }}
+          />
+        </div>
+      ) : (
+        <div className="pointer-events-none absolute inset-0 z-0 min-h-full bg-black" aria-hidden />
+      )}
+      <div
+        className="pointer-events-none absolute inset-0 z-[1] min-h-full w-full"
+        style={CHECKOUT_BLUR_OVERLAY}
+        aria-hidden
+      />
+    </>
   );
 
-  if (loading) {
+  if (loading || !prefDone) {
     return (
-      <>
+      <div className={`relative min-h-[100dvh] w-full bg-black ${SITE_NAV_BLEED}`}>
         {checkoutBackdrop}
-        <div className={`relative mx-auto max-w-4xl px-4 py-20 text-center ${siteBodyMutedClass}`}>
-          Cargando checkout...
+        <div className="relative z-10 min-h-[85dvh]">
+          <PurchaseFlowEmbeddedCard
+            title="Preparando checkout…"
+            subtitle="Cargando pago seguro"
+            icon="ticket"
+          />
         </div>
-      </>
+      </div>
     );
   }
 
   if (!event) {
     return (
-      <>
+      <div className={`relative min-h-[100dvh] w-full bg-black ${SITE_NAV_BLEED}`}>
         {checkoutBackdrop}
-        <div className="relative mx-auto max-w-3xl px-4 py-20">
+        <div className="relative z-10 mx-auto max-w-3xl px-4 py-20">
           <div className={`rounded-2xl border border-red-500/30 bg-red-500/10 p-6 text-red-100 ${siteBodyTextClass}`}>
             {error ?? "Evento no disponible."}
           </div>
         </div>
-      </>
+      </div>
     );
   }
 
-  /** Misma anchura en móvil para barra de progreso y tarjetas (pasos 2–4). */
-  const checkoutStepColumn =
-    step >= 2 && step <= 4 ? "mx-auto w-full max-w-md sm:max-w-2xl" : "w-full";
+  if (ticketTypesOrdered.length === 0) {
+    return (
+      <div className={`relative min-h-[100dvh] w-full bg-black ${SITE_NAV_BLEED}`}>
+        {checkoutBackdrop}
+        <div className="relative z-10 mx-auto max-w-lg px-4 py-20 text-center">
+          <p className={siteBodyTextClass}>Este evento no tiene entradas a la venta por ahora.</p>
+          <Link
+            href={`/e/${event.slug}`}
+            className={`btn-primary mt-6 inline-flex min-h-[44px] items-center justify-center px-6 ${siteBodyTextClass}`}
+          >
+            Volver al evento
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  if (!selectedType) {
+    return (
+      <div className={`relative min-h-[100dvh] w-full bg-black ${SITE_NAV_BLEED}`}>
+        {checkoutBackdrop}
+        <div className="relative z-10 mx-auto max-w-lg px-4 py-20 text-center">
+          <p className={`${siteBodyTextClass} text-white/90`}>
+            Para comprar, elige primero un tipo de entrada en la página del evento y pulsa{" "}
+            <span className="font-semibold text-white">Seleccionar</span>.
+          </p>
+          <Link
+            href={`/e/${event.slug}`}
+            className={`btn-primary mt-6 inline-flex min-h-[44px] items-center justify-center px-6 ${siteBodyTextClass}`}
+          >
+            Ir al evento
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  /** Misma anchura en móvil para barra de progreso y tarjetas */
+  const checkoutStepColumn = "mx-auto w-full max-w-md sm:max-w-2xl";
 
   return (
-    <>
+    <div className={`relative min-h-[100dvh] w-full bg-black ${SITE_NAV_BLEED}`}>
       {checkoutBackdrop}
       <div
-        className="relative mx-auto w-full max-w-5xl px-4 py-12 md:px-6"
+        className="relative z-10 mx-auto w-full max-w-5xl px-4 py-12 md:px-6"
       >
-      <header className="w-full min-w-0 text-center sm:text-left">
-        <p
-          className={`text-[11px] font-normal uppercase tracking-[0.18em] text-white/55 ${
-            step === 1 ? "max-md:mt-1" : ""
-          }`}
-        >
-          Checkout
-        </p>
-        <h1 className="mt-2 text-2xl font-bold leading-tight tracking-tight text-white sm:text-3xl md:text-4xl">
-          {event.title}
-        </h1>
-        <p
-          className={`${siteBodyTextClass} ${
-            step === 1 ? "mt-1.5 line-clamp-2" : "mt-2"
-          }`}
-        >
-          {formatDate(event.startAt)} · {event.venue?.name}
-        </p>
-      </header>
+      <header className={`mb-6 w-full min-w-0 md:mb-8 ${checkoutHeaderPanel}`}>
+        <div className="flex items-start gap-3 sm:gap-4">
+          {eventHeaderCoverSrc ? (
+            <div className="relative h-[4.25rem] w-[4.25rem] shrink-0 overflow-hidden rounded-xl border border-white/12 bg-black/35 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.06)] sm:h-[4.75rem] sm:w-[4.75rem]">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={eventHeaderCoverSrc}
+                alt=""
+                className="h-full w-full object-cover object-center"
+              />
+            </div>
+          ) : (
+            <div className="flex h-[4.25rem] w-[4.25rem] shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.05] text-sm font-semibold text-white/35 sm:h-[4.75rem] sm:w-[4.75rem]">
+              G
+            </div>
+          )}
+          <div className="min-w-0 flex-1 pt-0.5 text-left">
+            <p className="text-xs font-normal uppercase tracking-[0.18em] text-white/55">Checkout</p>
+            <h1 className="mt-1.5 text-2xl font-bold leading-tight tracking-tight text-white sm:text-3xl md:text-4xl">
+              {event.title}
+            </h1>
+            <p className="mt-2 text-sm text-white/55">
+              {[formatDate(event.startAt), event.venue?.name].filter(Boolean).join(" · ")}
+            </p>
+          </div>
+        </div>
 
-      <div
-        className={`h-2 min-w-0 overflow-hidden rounded-full bg-night-800 ${checkoutStepColumn} ${
-          step === 1 && coverUrl ? "mt-4 max-md:mt-4 md:mt-6" : "mt-6"
-        }`}
-      >
-        <div
-          className="h-full bg-gradient-to-r from-gozalo-blue to-gozalo-accent transition-all"
-          style={{ width: `${(step / 4) * 100}%` }}
-        />
-      </div>
+        <div className={`mt-6 h-2 min-w-0 overflow-hidden rounded-full bg-night-800 ${checkoutStepColumn}`}>
+          <div
+            className="h-full bg-gradient-to-r from-gozalo-blue to-gozalo-accent transition-all"
+            style={{ width: `${(step / 3) * 100}%` }}
+          />
+        </div>
+      </header>
 
       {error && (
         <div className={`mt-5 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-red-100 ${siteBodyTextClass}`}>
@@ -252,103 +369,21 @@ export function CheckoutClient({
         </div>
       )}
 
-      {step === 1 && (
-        <>
-          {coverUrl && (
-            <div className="mt-5 flex w-full flex-col items-center gap-0 md:hidden sm:mt-6">
-              <div className="flex h-[17rem] w-full max-w-[min(100%,24rem)] items-center justify-center sm:h-[19rem] sm:max-w-[26rem]">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={coverUrl}
-                  alt=""
-                  className="max-h-full max-w-full object-contain"
-                />
-              </div>
-              <div
-                className="mt-1 h-px w-full max-w-[min(100%,20rem)] bg-gradient-to-r from-transparent via-white/20 to-transparent sm:max-w-xs"
-                aria-hidden
-              />
-            </div>
-          )}
-
-          <div
-            className={
-              coverUrl
-                ? "mt-8 max-md:mt-8 rounded-2xl border border-white/10 bg-gradient-to-b from-white/[0.08] to-night-900/80 p-4 shadow-lg shadow-black/30 max-md:rounded-3xl max-md:ring-1 max-md:ring-inset max-md:ring-white/5 md:mt-8 md:from-night-900/60 md:p-6 md:shadow-inner md:shadow-none"
-                : "mt-8 rounded-2xl border border-white/10 bg-gradient-to-b from-white/[0.08] to-night-900/80 p-4 max-md:rounded-3xl max-md:ring-1 max-md:ring-inset max-md:ring-white/5 md:from-night-900/60 md:p-6"
-            }
-          >
-            <div className="mb-3 flex w-full items-center justify-between gap-2 md:mb-1 md:justify-start md:gap-3">
-              <span className="rounded-full border border-white/10 bg-white/[0.08] px-2.5 py-1.5 text-[10px] font-normal uppercase tracking-wider text-white/80 max-md:shadow-sm md:py-1">
-                Paso 1 de 4
-              </span>
-              <span className="text-[10px] font-normal uppercase tracking-[0.2em] text-[#9B7FCA]/90 max-md:opacity-90 md:hidden">
-                Entradas
-              </span>
-            </div>
-            <h2 className={`mt-1 max-md:mt-0 md:mt-1 ${siteSectionTitleClass}`}>
-              <span className="hidden md:inline">Paso 1 · </span>Selecciona tu entrada
-            </h2>
-            <p className={`mt-1.5 md:mt-2 ${siteBodyMutedClass}`}>
-              <span className="md:hidden">Toca un tipo y te llevamos al checkout.</span>
-              <span className="hidden md:inline">Elige un tipo y te llevamos al panel de checkout.</span>
-            </p>
-            <div className="mt-4 max-md:space-y-2.5 space-y-3">
-              {ticketTypes.map((t) => {
-                const id = t.id ?? t.name;
-                const isSel = selectedTypeId === id;
-                return (
-                  <button
-                    key={id}
-                    type="button"
-                    onClick={() => {
-                      setSelectedTypeId(id);
-                      setStep(2);
-                    }}
-                    className={[
-                      "flex w-full items-center justify-between gap-3 text-left transition",
-                      "rounded-xl border px-4 py-3",
-                      "max-md:rounded-2xl max-md:px-4 max-md:py-3.5",
-                      isSel
-                        ? "border-gozalo-blue bg-gozalo-blue/10 max-md:ring-2 max-md:ring-[#9B7FCA]/45 max-md:ring-offset-2 max-md:ring-offset-[#0a0a0a] max-md:shadow-md max-md:shadow-[#7B5EA7]/10"
-                        : "border-white/10 bg-night-800/60 hover:border-white/20 max-md:border-white/10 max-md:bg-white/[0.04]",
-                    ].join(" ")}
-                  >
-                    <div className="min-w-0 flex-1">
-                      <p className={`text-white ${siteBodyTextClass}`}>{t.name}</p>
-                      {t.description && (
-                        <p className={`mt-0.5 line-clamp-2 ${siteBodyMutedClass}`}>{t.description}</p>
-                      )}
-                    </div>
-                    <div className="flex shrink-0 items-center gap-2.5">
-                      <p className={`shrink-0 tabular-nums text-gozalo-blue ${siteBodyTextClass}`}>
-                        {formatMoney(Number(t.price))}
-                      </p>
-                      {isSel && <IconCheckCircle className="hidden max-md:block" />}
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </>
-      )}
-
-      {step === 2 && selectedType && (
+      {step === 1 && selectedType && (
         <div
           className={`mt-8 grid w-full grid-cols-1 gap-4 sm:gap-5 md:grid-cols-2 md:items-stretch ${checkoutStepColumn}`}
         >
-          <div className="flex h-full min-h-0 flex-col rounded-2xl border border-white/10 bg-night-900/65 p-5 text-center ring-1 ring-inset ring-white/[0.06] sm:p-6 md:text-left">
+          <div className={`flex h-full min-h-0 flex-col rounded-2xl p-5 text-center sm:p-6 md:text-left ${checkoutGlassCard}`}>
             <span className="mx-auto inline-flex rounded-full border border-white/10 bg-white/[0.06] px-2.5 py-1.5 text-[10px] font-normal uppercase tracking-wider text-white/75 md:mx-0">
-              Paso 2 de 4
+              Paso 1 de 3
             </span>
             <h2 className={`mt-3 ${siteSectionTitleClass}`}>Selecciona la cantidad</h2>
             <p className={`mt-2 ${siteBodyTextClass}`}>{selectedType.name}</p>
-            {showQuantityToPublic && available != null && (
+            {showQuantityToPublic && remainingForSelected != null && (
               <p className={`mt-1 ${siteBodyMutedClass}`}>
                 Disponibles:{" "}
                 <span className={`${siteCheckoutFiguresSansClass} font-semibold text-white/[0.78]`}>
-                  {available}
+                  {remainingForSelected}
                 </span>
               </p>
             )}
@@ -361,7 +396,7 @@ export function CheckoutClient({
                   type="button"
                   onClick={() => setQty((q) => Math.max(1, q - 1))}
                   className="flex size-[3rem] shrink-0 items-center justify-center justify-self-center rounded-full border border-white/14 bg-white/[0.06] font-light text-[1.85rem] leading-none text-white/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] transition hover:bg-white/[0.1] active:scale-[0.96] sm:size-[3.35rem] sm:text-[2rem]"
-                  aria-label="Quitar una entrada"
+                  aria-label="Quitar un ticket"
                 >
                   −
                 </button>
@@ -375,17 +410,19 @@ export function CheckoutClient({
                   }}
                 >
                   <span className="sr-only">
-                    Cantidad seleccionada: {qty === 1 ? "1 entrada" : `${qty} entradas`}.
+                    Cantidad seleccionada: {qty === 1 ? "1 ticket" : `${qty} tickets`}.
                   </span>
                   {qty}
                 </span>
                 <button
                   type="button"
                   onClick={() =>
-                    setQty((q) => (available != null ? Math.min(available, q + 1) : q + 1))
+                    setQty((q) =>
+                      remainingForSelected != null ? Math.min(remainingForSelected, q + 1) : q + 1
+                    )
                   }
                   className="flex size-[3rem] shrink-0 items-center justify-center justify-self-center rounded-full border border-white/14 bg-white/[0.06] font-light text-[1.85rem] leading-none text-white/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] transition hover:bg-white/[0.1] active:scale-[0.96] sm:size-[3.35rem] sm:text-[2rem]"
-                  aria-label="Añadir una entrada"
+                  aria-label="Añadir un ticket"
                 >
                   +
                 </button>
@@ -394,16 +431,16 @@ export function CheckoutClient({
           </div>
 
           <div
-            className={`flex h-full min-h-0 flex-col rounded-2xl border border-white/10 bg-night-900/65 p-5 ring-1 ring-inset ring-white/[0.06] sm:p-6 ${siteCheckoutFiguresSansClass}`}
+            className={`flex h-full min-h-0 flex-col rounded-2xl p-5 sm:p-6 ${checkoutGlassCard} ${siteCheckoutFiguresSansClass}`}
           >
             <div className="flex items-end justify-between gap-3 md:block">
               <h3 className={`md:text-left !font-medium ${siteSectionTitleClass}`}>Resumen</h3>
               <p className={`font-sans md:mt-0.5 md:text-left ${siteCheckoutSummaryRowsClass} tabular-nums text-white/50`}>
-                {qty === 1 ? "1 entrada" : `${qty} entradas`}
+                {qty === 1 ? "1 ticket" : `${qty} tickets`}
               </p>
             </div>
             <div
-              className={`mt-4 flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-white/[0.07] bg-[#07070d]/95 font-normal text-white/75 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] ${siteCheckoutSummaryRowsClass}`}
+              className={`mt-4 flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl font-normal text-white/75 ${checkoutGlassInset} ${siteCheckoutSummaryRowsClass}`}
             >
               <div className="border-b border-white/[0.07] px-3.5 py-2.5 font-sans text-[10px] font-normal uppercase tracking-[0.16em] text-white/42">
                 Desglose
@@ -426,10 +463,6 @@ export function CheckoutClient({
                   <span>Subtotal</span>
                   <span className="tabular-nums text-white/88">{formatMoney(subtotal)}</span>
                 </div>
-                <div className="flex items-center justify-between gap-6 px-3.5 py-2.5 text-white/70">
-                  <span className="min-w-0 leading-snug">Gastos de gestión (10&nbsp;%)</span>
-                  <span className="tabular-nums text-white/88">{formatMoney(fee)}</span>
-                </div>
               </div>
               <div className="flex items-center justify-between gap-6 border-t border-white/[0.1] bg-white/[0.04] px-3.5 py-3 font-sans text-[13px] text-white sm:text-[14px] md:text-[15px]">
                 <span className="font-medium tracking-wide">Total</span>
@@ -437,16 +470,15 @@ export function CheckoutClient({
               </div>
             </div>
             <div className="mx-auto mt-5 grid w-full max-w-sm grid-cols-2 gap-2.5 sm:gap-3 md:mx-0 md:mt-auto md:max-w-none">
-              <button
-                type="button"
-                onClick={() => setStep(1)}
+              <Link
+                href={`/e/${event.slug}`}
                 className={`inline-flex min-h-[38px] w-full items-center justify-center rounded-lg border border-white/12 bg-white/[0.03] px-3 py-2 text-center font-sans text-[13px] font-normal text-white ring-1 ring-inset ring-white/[0.05] transition hover:border-white/18 hover:bg-white/[0.07] sm:text-sm`}
               >
-                Atrás
-              </button>
+                Volver al evento
+              </Link>
               <button
                 type="button"
-                onClick={() => setStep(3)}
+                onClick={() => setStep(2)}
                 className={`btn-primary inline-flex min-h-[38px] w-full items-center justify-center rounded-lg !px-3 !py-2 text-center font-sans text-[13px] !font-normal sm:text-sm`}
               >
                 Continuar
@@ -456,21 +488,56 @@ export function CheckoutClient({
         </div>
       )}
 
-      {step === 3 && selectedType && (
+      {step === 2 && selectedType && (
         <div
-          className={`mt-8 rounded-2xl border border-white/10 bg-night-900/60 p-5 ring-1 ring-inset ring-white/[0.06] sm:p-6 ${checkoutStepColumn}`}
+          className={`mt-8 rounded-2xl p-5 sm:p-6 ${checkoutGlassCard} ${checkoutStepColumn}`}
         >
           <div className="mx-auto flex max-w-lg flex-col items-center text-center sm:max-w-none sm:items-stretch sm:text-left">
             <span className="inline-flex rounded-full border border-white/10 bg-white/[0.06] px-2.5 py-1.5 text-[10px] font-normal uppercase tracking-wider text-white/75">
-              Paso 3 de 4
+              Paso 2 de 3
             </span>
-            <h2 className={`mt-3 sm:mt-2 ${siteSectionTitleClass}`}>Paso 3 · Pago</h2>
+            <h2 className={`mt-3 sm:mt-2 ${siteSectionTitleClass}`}>Pago</h2>
             <p className={`mt-2 max-w-sm sm:max-w-none ${siteBodyMutedClass}`}>
               Confirma tu compra para generar tus QR al instante.
             </p>
           </div>
+          {!getToken() ? (
+            <div className={`mt-5 w-full max-w-md space-y-3 text-left sm:mx-auto ${siteBodyTextClass}`}>
+              <p className={`text-[13px] ${siteBodyMutedClass}`}>
+                Sin iniciar sesión usamos tu correo para enviarte los QR y asociar la compra a una cuenta cliente.
+              </p>
+              <div>
+                <label htmlFor="checkout-buyer-email" className="mb-1.5 block text-[11px] font-medium uppercase tracking-wider text-white/50">
+                  Correo electrónico
+                </label>
+                <input
+                  id="checkout-buyer-email"
+                  type="email"
+                  autoComplete="email"
+                  value={buyerEmail}
+                  onChange={(e) => setBuyerEmail(e.target.value)}
+                  placeholder="tu@correo.com"
+                  className="w-full rounded-xl border border-white/12 bg-black/40 px-3.5 py-2.5 text-[15px] text-white placeholder:text-white/30 focus:border-white/25 focus:outline-none focus:ring-1 focus:ring-white/20"
+                />
+              </div>
+              <div>
+                <label htmlFor="checkout-buyer-name" className="mb-1.5 block text-[11px] font-medium uppercase tracking-wider text-white/50">
+                  Nombre completo
+                </label>
+                <input
+                  id="checkout-buyer-name"
+                  type="text"
+                  autoComplete="name"
+                  value={buyerFullName}
+                  onChange={(e) => setBuyerFullName(e.target.value)}
+                  placeholder="Como figura en la entrada"
+                  className="w-full rounded-xl border border-white/12 bg-black/40 px-3.5 py-2.5 text-[15px] text-white placeholder:text-white/30 focus:border-white/25 focus:outline-none focus:ring-1 focus:ring-white/20"
+                />
+              </div>
+            </div>
+          ) : null}
           <div
-            className={`mt-4 grid gap-y-2 rounded-xl border border-white/10 bg-night-950/50 p-4 font-medium text-white/70 ring-1 ring-inset ring-white/[0.05] sm:p-5 ${siteCheckoutFiguresSansClass} ${siteCheckoutSummaryRowsClass}`}
+            className={`mt-4 grid gap-y-2 rounded-xl p-4 font-medium text-white/70 sm:p-5 ${checkoutGlassInset} ${siteCheckoutFiguresSansClass} ${siteCheckoutSummaryRowsClass}`}
           >
             <div className={siteCheckoutSummaryGridClass}>
               <span className="min-w-0 text-left leading-snug text-white opacity-95">
@@ -482,7 +549,6 @@ export function CheckoutClient({
               <span className="tabular-nums">{qty}</span>
               {" × "}
               <span className="tabular-nums">{formatMoney(unitPrice)}</span>
-              {" + comisión 10 %"}
             </p>
             <div
               className={`${siteCheckoutSummaryGridClass} border-t border-white/10 pt-2 text-[13px] tracking-wide text-white sm:text-[14px] md:text-[15px]`}
@@ -494,7 +560,7 @@ export function CheckoutClient({
           <div className="mt-6 grid w-full min-w-0 grid-cols-2 gap-3 sm:gap-3.5">
             <button
               type="button"
-              onClick={() => setStep(2)}
+              onClick={() => setStep(1)}
               className={`inline-flex min-h-[50px] min-w-0 w-full max-w-full items-center justify-center rounded-xl border border-white/10 bg-white/[0.02] px-1.5 py-2.5 text-center font-normal text-white ring-1 ring-inset ring-white/[0.06] transition hover:border-white/15 hover:bg-white/[0.06] sm:px-3 ${siteBodyTextClass}`}
             >
               Atrás
@@ -511,9 +577,9 @@ export function CheckoutClient({
         </div>
       )}
 
-      {step === 4 && result && (
+      {step === 3 && result && (
         <div className={`mt-8 space-y-6 ${checkoutStepColumn}`}>
-          <div className="rounded-2xl border border-white/10 bg-night-900/45 p-5 text-center ring-1 ring-inset ring-white/[0.07] sm:p-6">
+          <div className={`rounded-2xl p-5 text-center sm:p-6 ${checkoutGlassCard}`}>
             <p className="text-[10px] font-normal uppercase tracking-[0.2em] text-emerald-400/90">Compra completada</p>
             <h2 className={`mt-2 ${siteSectionTitleClass}`}>Gracias por tu compra</h2>
             <p className="mt-1 font-mono text-[13px] text-white/50">Orden {result.orderId}</p>
@@ -546,7 +612,7 @@ export function CheckoutClient({
               Ver en mis entradas
             </Link>
             <Link
-              href={`/eventos/${event.slug}`}
+              href={`/e/${event.slug}`}
               className={`inline-flex min-h-[50px] w-full min-w-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.02] text-center font-normal text-white ring-1 ring-inset ring-white/[0.06] transition hover:border-white/15 hover:bg-white/[0.06] ${siteBodyTextClass}`}
             >
               Volver al evento
@@ -555,6 +621,6 @@ export function CheckoutClient({
         </div>
       )}
     </div>
-    </>
+    </div>
   );
 }

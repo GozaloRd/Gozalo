@@ -16,10 +16,42 @@ function readTokenFromCookie(): string | null {
   }
 }
 
-export function setAuthToken(token: string) {
+async function persistSessionCookie(token: string): Promise<boolean> {
+  try {
+    const res = await fetch("/api/auth/session", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify({ token }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+function setLegacyReadableCookie(token: string) {
+  if (typeof window === "undefined") return;
+  const secure = window.location.protocol === "https:";
+  const parts = [
+    `${COOKIE_NAME}=${encodeURIComponent(token)}`,
+    "Path=/",
+    `Max-Age=${COOKIE_AGE_SECONDS}`,
+    "SameSite=Lax",
+    ...(secure ? (["Secure"] as const) : []),
+  ];
+  document.cookie = parts.join("; ");
+}
+
+/** Persiste sesión: localStorage + cookie HttpOnly vía mismo origen (+ fallback legacy si falla la ruta API). */
+export async function setAuthToken(token: string): Promise<void> {
   if (typeof window === "undefined") return;
   localStorage.setItem(TOKEN_KEY, token);
-  document.cookie = `${COOKIE_NAME}=${encodeURIComponent(token)}; Path=/; Max-Age=${COOKIE_AGE_SECONDS}; SameSite=Lax`;
+  const ok = await persistSessionCookie(token);
+  if (!ok) setLegacyReadableCookie(token);
 }
 
 export function getAuthToken(): string | null {
@@ -27,8 +59,28 @@ export function getAuthToken(): string | null {
   return localStorage.getItem(TOKEN_KEY) || readTokenFromCookie();
 }
 
-export function clearAuthToken() {
+async function clearSessionCookie(): Promise<void> {
+  try {
+    await fetch("/api/auth/session", {
+      method: "DELETE",
+      credentials: "same-origin",
+    });
+  } catch {
+    /* noop */
+  }
+}
+
+export async function clearAuthToken(): Promise<void> {
   if (typeof window === "undefined") return;
   localStorage.removeItem(TOKEN_KEY);
-  document.cookie = `${COOKIE_NAME}=; Path=/; Max-Age=0; SameSite=Lax`;
+  await clearSessionCookie();
+  const secure = typeof window !== "undefined" && window.location.protocol === "https:";
+  const parts = [
+    `${COOKIE_NAME}=`,
+    "Path=/",
+    "Max-Age=0",
+    "SameSite=Lax",
+    ...(secure ? (["Secure"] as const) : []),
+  ];
+  document.cookie = parts.join("; ");
 }

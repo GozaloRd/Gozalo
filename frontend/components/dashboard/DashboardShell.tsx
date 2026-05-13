@@ -1,11 +1,8 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
-import { usePathname } from "next/navigation";
 import { CreateVenueOnboarding } from "./CreateVenueOnboarding";
 import { AdminVenuePicker } from "./AdminVenuePicker";
-import { VenueProSidebar } from "./VenueProSidebar";
-import { DashboardProHeader } from "./DashboardProHeader";
 import { DashboardMobileHeader } from "./DashboardMobileHeader";
 import { VenuePendingApprovalScreen } from "./VenuePendingApprovalScreen";
 import { useDashboard } from "@/contexts/DashboardContext";
@@ -58,8 +55,6 @@ export function DashboardShell({ children }: { children: ReactNode }) {
     useDashboard();
   const [open, setOpen] = useState(false);
   const [approvalCheckLoading, setApprovalCheckLoading] = useState(false);
-  const pathname = usePathname();
-  const showDateRange = pathname === "/dashboard";
 
   if (loading) {
     return (
@@ -136,37 +131,45 @@ export function DashboardShell({ children }: { children: ReactNode }) {
       <DashboardMobileHeader venueName={venue.name} onOpenSidebar={() => setOpen(true)} />
 
       {open && (
-        <button
-          type="button"
-          className="fixed inset-0 z-40 bg-black/60 lg:hidden"
-          aria-label="Cerrar menú"
+        <div
+          className="fixed inset-0 z-40 bg-black/70 md:hidden"
+          role="presentation"
           onClick={() => setOpen(false)}
-        />
+        >
+          <div
+            className="absolute right-3 top-16 w-48 rounded-2xl border border-white/[0.08] bg-[#15151F] p-2 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {isAdminViewer ? (
+              <button
+                type="button"
+                onClick={() => {
+                  void clearVenueSelection();
+                  setOpen(false);
+                }}
+                className="w-full rounded-xl px-3 py-2 text-left text-sm text-slate-200 transition hover:bg-white/[0.06]"
+              >
+                Cambiar local
+              </button>
+            ) : null}
+            <button
+              type="button"
+              onClick={() => setOpen(false)}
+              className="w-full rounded-xl px-3 py-2 text-left text-sm text-slate-400 transition hover:bg-white/[0.06]"
+            >
+              Cerrar
+            </button>
+          </div>
+        </div>
       )}
 
-      <div className="flex min-h-screen">
-        <aside
-          className={`fixed bottom-0 left-0 top-0 z-50 transition-transform duration-150 ease-out lg:translate-x-0 ${
-            open ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
-          }`}
-        >
-          <VenueProSidebar
-            venueName={venue.name}
-            onNavigate={() => setOpen(false)}
-            isAdminViewer={isAdminViewer}
-            onChangeVenue={clearVenueSelection}
-          />
-        </aside>
-
-        <div className="flex min-h-screen flex-1 flex-col pl-0 lg:pl-[240px]">
-          <DashboardProHeader showDateRange={showDateRange} />
-          <div className="h-14 shrink-0 lg:hidden" aria-hidden />
-          <main className="flex-1 overflow-y-auto px-4 py-6 md:px-8">
-            <VenueLifecycleBanner venue={venue} isAdminViewer={isAdminViewer} />
-            {children}
-          </main>
+      <div className="h-14 shrink-0 md:hidden" aria-hidden />
+      <main className="min-h-[calc(100vh-3.5rem)] md:min-h-screen">
+        <div className="mx-auto w-full max-w-[1600px] px-0 md:max-w-none">
+          <VenueLifecycleBanner venue={venue} isAdminViewer={isAdminViewer} />
+          {children}
         </div>
-      </div>
+      </main>
     </div>
   );
 }

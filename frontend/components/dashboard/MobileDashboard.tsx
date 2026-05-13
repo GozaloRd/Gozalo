@@ -1,9 +1,8 @@
 "use client";
 
-import Link from "next/link";
-import { ChevronDown } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AreaSubmenu } from "@/components/dashboard/AreaSubmenu";
+import { HeaderDivider } from "@/components/dashboard/HeaderDivider";
 import { QuickActionBubbles } from "@/components/dashboard/QuickActionBubbles";
 import type { QuickAreaId } from "@/components/dashboard/quickActions.config";
 import { StarryBackground } from "@/components/dashboard/StarryBackground";
@@ -43,6 +42,8 @@ type Analytics = {
 
 type Props = {
   upcomingEvents: UpcomingEventModel[];
+  /** Opcional (desktop estadísticas); móvil no lo usa. */
+  allVenueEvents?: UpcomingEventModel[];
   stats: Stats | null;
   analytics: Analytics | null;
   loading: boolean;
@@ -71,8 +72,12 @@ export function MobileDashboard({
   useEffect(() => {
     if (!activeQuickArea) return;
     const onPointerDown = (e: PointerEvent) => {
+      const t = e.target;
+      if (t instanceof Element && t.closest("[data-prevent-dashboard-collapse]")) {
+        return;
+      }
       const el = quickActionsRef.current;
-      if (el && !el.contains(e.target as Node)) {
+      if (el && !el.contains(t as Node)) {
         setActiveQuickArea(null);
       }
     };
@@ -84,37 +89,27 @@ export function MobileDashboard({
     <div className="relative min-h-screen bg-black md:min-h-0 md:bg-transparent">
       <StarryBackground />
       <div className="relative z-10">
-        <section
-          className="mx-auto w-full max-w-md space-y-5 px-4 pb-6 pt-0"
-          aria-label="Panel móvil"
-        >
-          <Link
-            href="/dashboard/configuracion"
-            className="flex min-h-[52px] w-full items-center gap-3 rounded-2xl border border-white/[0.1] bg-zinc-900/90 px-4 py-3 text-sm shadow-lg backdrop-blur-sm transition hover:bg-zinc-800/95 motion-safe:duration-150 active:scale-[0.99]"
-            aria-label="Configura tu organización (progreso 0 de 5)"
-          >
-            <span className="min-w-0 flex-1 font-medium text-white/90">Configura tu organización</span>
-            <span className="shrink-0 rounded-md bg-white/[0.06] px-2 py-1 text-xs font-bold tabular-nums text-amber-500">
-              0/5
-            </span>
-            <ChevronDown className="h-5 w-5 shrink-0 text-slate-500" aria-hidden />
-          </Link>
-
-          <div ref={quickActionsRef}>
-            <QuickActionBubbles activeAreaId={activeQuickArea} onToggleArea={toggleQuickArea} />
-            <AreaSubmenu
-              activeAreaId={activeQuickArea}
-              onClose={() => setActiveQuickArea(null)}
-              opsAlertCount={opsAlertCount}
-              upcomingEvents={upcomingEvents}
-              stats={stats}
-              analytics={analytics}
-              loading={loading}
-              nowMs={nowMs}
-              venueId={venueId ?? ""}
-              venueCity={venue?.city}
-              onRefreshData={onRefreshData}
-            />
+        <section className="mx-auto w-full max-w-md px-4 pb-6 pt-0" aria-label="Panel móvil">
+          <div className="sticky top-14 z-[43] -mx-4 mb-4 border-b border-white/[0.06] bg-[#0A0A0F]/70 px-4 pb-4 pt-3 backdrop-blur-xl supports-[backdrop-filter]:bg-[#0A0A0F]/60">
+            <HeaderDivider className="mb-4" />
+            <div ref={quickActionsRef}>
+              <QuickActionBubbles activeAreaId={activeQuickArea} onToggleArea={toggleQuickArea} />
+              <AreaSubmenu
+                activeAreaId={activeQuickArea}
+                onClose={() => setActiveQuickArea(null)}
+                opsAlertCount={opsAlertCount}
+                upcomingEvents={upcomingEvents}
+                stats={stats}
+                analytics={analytics}
+                loading={loading}
+                nowMs={nowMs}
+                venueId={venueId ?? ""}
+                venueCity={venue?.city}
+                venueName={venue?.name}
+                venueAddress={venue?.address}
+                onRefreshData={onRefreshData}
+              />
+            </div>
           </div>
         </section>
       </div>

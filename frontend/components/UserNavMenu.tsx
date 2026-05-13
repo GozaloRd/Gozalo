@@ -93,8 +93,8 @@ export function UserNavMenu() {
     router.push(href);
   }
 
-  function logout() {
-    logoutClient();
+  async function logout() {
+    await logoutClient();
     setUser(null);
     setOpen(false);
     router.push("/");

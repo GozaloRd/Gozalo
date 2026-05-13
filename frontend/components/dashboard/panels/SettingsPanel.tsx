@@ -1,7 +1,6 @@
 "use client";
 
 import type { ComponentType } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   Bell,
@@ -15,21 +14,13 @@ import {
   Sliders,
   UserCog,
 } from "lucide-react";
-import type { QuickAreaConfig } from "@/components/dashboard/quickActions.config";
-import { PanelFooterLinks } from "@/components/dashboard/panels/PanelFooterLinks";
 import { logoutClient } from "@/lib/authApi";
 
-export function SettingsPanel({
-  area,
-  opsAlertCount,
-}: {
-  area: QuickAreaConfig;
-  opsAlertCount: number;
-}) {
+export function SettingsPanel() {
   const router = useRouter();
 
-  function onLogout() {
-    logoutClient();
+  async function onLogout() {
+    await logoutClient();
     router.push("/");
     router.refresh();
   }
@@ -37,16 +28,16 @@ export function SettingsPanel({
   return (
     <div className="space-y-4">
       <ul className="space-y-2">
-        <SetRow href="/dashboard/configuracion" Icon={Building2} label="Datos del local" hint="Nombre, logo, descripción" />
-        <SetRow href="/dashboard/configuracion" Icon={CreditCard} label="Información fiscal y bancaria" />
-        <SetRow href="/dashboard/configuracion" Icon={CreditCard} label="Métodos de pago" />
-        <SetRow href="/dashboard/configuracion" Icon={UserCog} label="Usuarios y permisos" />
-        <SetRow href="/dashboard/configuracion" Icon={Clock} label="Horarios de apertura" />
-        <SetRow href="/dashboard/configuracion" Icon={Share2} label="Redes y contacto público" />
-        <SetRow href="/dashboard/configuracion" Icon={Plug} label="Integraciones" />
-        <SetRow href="/dashboard/configuracion" Icon={Bell} label="Notificaciones" />
-        <SetRow href="/dashboard/configuracion" Icon={Sliders} label="Preferencias (idioma, moneda, zona)" />
-        <SetRow href="/dashboard/configuracion" Icon={Globe2} label="Preferencias generales" />
+        <SetRow Icon={Building2} label="Datos del local" hint="Nombre, logo, descripción" />
+        <SetRow Icon={CreditCard} label="Información fiscal y bancaria" />
+        <SetRow Icon={CreditCard} label="Métodos de pago" />
+        <SetRow Icon={UserCog} label="Usuarios y permisos" />
+        <SetRow Icon={Clock} label="Horarios de apertura" />
+        <SetRow Icon={Share2} label="Redes y contacto público" />
+        <SetRow Icon={Plug} label="Integraciones" />
+        <SetRow Icon={Bell} label="Notificaciones" />
+        <SetRow Icon={Sliders} label="Preferencias (idioma, moneda, zona)" />
+        <SetRow Icon={Globe2} label="Preferencias generales" />
       </ul>
 
       <button
@@ -57,35 +48,28 @@ export function SettingsPanel({
         <LogOut className="h-4 w-4" aria-hidden />
         Cerrar sesión
       </button>
-
-      <PanelFooterLinks area={area} items={area.items} opsAlertCount={opsAlertCount} />
     </div>
   );
 }
 
 function SetRow({
-  href,
   Icon,
   label,
   hint,
 }: {
-  href: string;
   Icon: ComponentType<{ className?: string }>;
   label: string;
   hint?: string;
 }) {
   return (
     <li>
-      <Link
-        href={href}
-        className="flex items-start gap-3 rounded-xl border border-white/[0.06] bg-black/25 px-3 py-2.5 transition hover:bg-orange-600/10 active:scale-[0.99]"
-      >
+      <div className="flex items-start gap-3 rounded-xl border border-white/[0.06] bg-black/25 px-3 py-2.5">
         <Icon className="mt-0.5 h-4 w-4 shrink-0 text-orange-400" aria-hidden />
         <div>
           <p className="text-sm font-medium text-white">{label}</p>
           {hint ? <p className="text-xs text-slate-500">{hint}</p> : null}
         </div>
-      </Link>
+      </div>
     </li>
   );
 }

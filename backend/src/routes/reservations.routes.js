@@ -1,5 +1,5 @@
 const express = require('express');
-const { authenticate, requireRole } = require('../middleware/auth');
+const { authenticate, optionalAuth, requireRole } = require('../middleware/auth');
 const { requireVenueAccess } = require('../middleware/venueAccess');
 const reservationsController = require('../controllers/reservations.controller');
 const {
@@ -11,7 +11,7 @@ const {
 
 const router = express.Router();
 
-router.post('/', authenticate, createReservationValidator, validateRequest, reservationsController.createReservation);
+router.post('/', optionalAuth, createReservationValidator, validateRequest, reservationsController.createReservation);
 router.get('/my', authenticate, reservationsController.listMyReservations);
 router.get(
   '/venue/:venueId',

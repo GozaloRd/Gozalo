@@ -37,7 +37,7 @@ export function QuickActionBubbles({
               if (!expanded) hapticLight();
               onToggleArea(cfg.id);
             }}
-            className={`flex shrink-0 items-center justify-center overflow-hidden rounded-full border-2 transition-all duration-[250ms] ease-in-out motion-safe:transition-all active:scale-95 ${
+            className={`flex shrink-0 items-center justify-center overflow-hidden rounded-full border-2 transition-all duration-150 ease-out motion-safe:transition-all active:scale-[0.97] motion-safe:active:scale-[0.97] ${
               expanded
                 ? `h-11 min-h-[44px] px-3 ${cfg.bubbleExpandedClass} gap-1.5`
                 : `h-11 w-11 min-h-[44px] min-w-[44px] ${cfg.bubbleIdleClass}`

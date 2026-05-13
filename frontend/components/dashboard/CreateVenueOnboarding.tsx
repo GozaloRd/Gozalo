@@ -92,7 +92,7 @@ export function CreateVenueOnboarding() {
   return (
     <div className="flex min-h-screen flex-col items-center bg-gradient-to-br from-[#0A0A1A] via-[#120822] to-[#0A0A1A] px-4 py-10">
       <div className="mb-6 flex justify-center">
-        <LogoG />
+        <LogoG href="/dashboard" />
       </div>
 
       <ProgressBar step={step} />

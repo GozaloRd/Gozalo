@@ -21,9 +21,9 @@ export async function fetchAuthMe(): Promise<AuthUser | null> {
   }
 }
 
-export function logoutClient() {
+export async function logoutClient() {
   if (typeof window === "undefined") return;
-  clearAuthToken();
+  await clearAuthToken();
   localStorage.removeItem("gozalo_dashboard_venue_id");
 }
 

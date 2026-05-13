@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { EventWizard } from "@/components/dashboard/EventWizard";
+import { CreateEventWizard } from "@/components/dashboard/wizard/CreateEventWizard";
+import { useIsMobile } from "@/hooks/useMediaQuery";
 import RecurrenceModal from "@/components/dashboard/RecurrenceModal";
 import { useDashboard } from "@/contexts/DashboardContext";
 import {
@@ -39,6 +41,7 @@ type EventRow = {
   requiresCoverForTable?: boolean;
   destacado?: boolean;
   publicado?: boolean;
+  ticketSaleMode?: string;
   metricas?: {
     ticketsVendidos?: number;
     reservasHechas?: number;
@@ -130,6 +133,7 @@ function formatEventWhen(startAt: string, endAt: string) {
 
 export default function DashboardEventosPage() {
   const { venue, venueId } = useDashboard();
+  const isMobile = useIsMobile();
   const searchParams = useSearchParams();
   const ownerBlocked =
     venue?.status === "pending" || venue?.status === "rejected";
@@ -144,11 +148,11 @@ export default function DashboardEventosPage() {
   const LIVE_SYNC_MS = 5_000;
 
   useEffect(() => {
-    const t = searchParams.get("tab");
+    const t = searchParams?.get("tab");
     if (t === "all" || t === "published" || t === "draft" || t === "past") {
       setTab(t);
     }
-    setSearchQ(searchParams.get("q") ?? "");
+    setSearchQ(searchParams?.get("q") ?? "");
   }, [searchParams]);
 
   const load = useCallback(async () => {
@@ -377,7 +381,7 @@ export default function DashboardEventosPage() {
                 </p>
                 {ev.slug && isPub && (
                   <Link
-                    href={`/eventos/${ev.slug}`}
+                    href={`/e/${ev.slug}`}
                     className="mt-2 inline-block text-xs font-medium hover:underline"
                     style={{ color: GOLD }}
                   >
@@ -466,7 +470,26 @@ export default function DashboardEventosPage() {
         })}
       </div>
 
-      {wizard && venueId && (
+      {wizard && venueId && isMobile && (
+        <CreateEventWizard
+          venueId={venueId}
+          venueCity={venue?.city}
+          venueName={venue?.name}
+          venueAddress={venue?.address ?? ""}
+          initial={
+            wizard === "edit" && editing
+              ? (editing as unknown as Record<string, unknown>)
+              : null
+          }
+          onClose={() => {
+            setWizard(null);
+            setEditing(null);
+          }}
+          onSaved={() => void load()}
+        />
+      )}
+
+      {wizard && venueId && !isMobile && (
         <EventWizard
           venueId={venueId}
           venueCity={venue?.city}

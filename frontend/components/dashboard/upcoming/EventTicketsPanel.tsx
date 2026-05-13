@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { motion } from "framer-motion";
 import { X } from "lucide-react";
 import { formatMoney } from "@/lib/format";
@@ -11,6 +10,8 @@ export type TicketTypeRow = {
   price: number | string;
   quantityTotal?: number;
   soldCount?: number;
+  active?: boolean;
+  sortOrder?: number;
 };
 
 type Props = {
@@ -116,12 +117,6 @@ export function EventTicketsPanel({ eventId, types, onClose }: Props) {
                 Total ingresos (estim. por tipo):{" "}
                 <span className="font-semibold text-white">{formatMoney(totalRev)}</span>
               </p>
-              <Link
-                href="/dashboard/tickets"
-                className="mt-3 inline-flex text-sm font-medium text-[#2979FF] hover:underline"
-              >
-                Ver detalle completo →
-              </Link>
             </div>
           </>
         )}

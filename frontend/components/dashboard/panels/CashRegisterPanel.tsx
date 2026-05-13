@@ -1,22 +1,22 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState, type ComponentType } from "react";
-import Link from "next/link";
-import { AlertTriangle, Archive, Calculator, CreditCard, Lock, Wallet } from "lucide-react";
-import type { QuickAreaConfig } from "@/components/dashboard/quickActions.config";
-import { PanelFooterLinks } from "@/components/dashboard/panels/PanelFooterLinks";
+import { AnimatePresence, motion } from "framer-motion";
+import { Calculator, CreditCard, FileText, Receipt, Wallet } from "lucide-react";
+import { MobilePanelRow } from "@/components/dashboard/mobile/shared/MobilePanelRow";
+import { CashNewReportFlow } from "@/components/dashboard/panels/cash-flow/CashNewReportFlow";
+import {
+  CashReportHistoryFlow,
+  type CashClosingRow,
+} from "@/components/dashboard/panels/cash-flow/CashReportHistoryFlow";
 import { useDashboard } from "@/contexts/DashboardContext";
 import { fetchCashClosings } from "@/lib/dashboardApi";
 import { formatMoney } from "@/lib/format";
 
-type ClosingRow = {
-  id: string;
-  createdAt?: string;
-  grandTotal?: string | number;
-  cashTotal?: string | number;
-  cardTotal?: string | number;
-  transferTotal?: string | number;
-  metadata?: { breakdown?: unknown } | null;
+const fadeSlide = {
+  initial: { opacity: 0, y: 10 },
+  animate: { opacity: 1, y: 0, transition: { duration: 0.28, ease: [0, 0, 0.2, 1] as const } },
+  exit: { opacity: 0, y: -12, transition: { duration: 0.22, ease: [0.4, 0, 1, 1] as const } },
 };
 
 type Breakdown = {
@@ -30,15 +30,16 @@ function channelTotal(b: Breakdown, key: keyof Breakdown) {
   return x.cash + x.card + x.transfer + (x.other ?? 0);
 }
 
+type CajaView = "main" | "newReport" | "history";
+
 export function CashRegisterPanel({
-  area,
-  opsAlertCount,
+  onRegisterCajaCloseGuard,
 }: {
-  area: QuickAreaConfig;
-  opsAlertCount: number;
-}) {
+  onRegisterCajaCloseGuard?: (fn: (() => boolean) | null) => void;
+} = {}) {
   const { venueId } = useDashboard();
-  const [closings, setClosings] = useState<ClosingRow[]>([]);
+  const [view, setView] = useState<CajaView>("main");
+  const [closings, setClosings] = useState<CashClosingRow[]>([]);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
@@ -46,7 +47,7 @@ export function CashRegisterPanel({
     setLoading(true);
     try {
       const cc = await fetchCashClosings(venueId);
-      const rows = (cc as { data?: ClosingRow[] })?.data ?? [];
+      const rows = (cc as { data?: CashClosingRow[] })?.data ?? [];
       setClosings(rows);
     } catch {
       setClosings([]);
@@ -58,6 +59,19 @@ export function CashRegisterPanel({
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    if (!onRegisterCajaCloseGuard) return;
+    const fn = () => {
+      if (view !== "main") {
+        setView("main");
+        return true;
+      }
+      return false;
+    };
+    onRegisterCajaCloseGuard(fn);
+    return () => onRegisterCajaCloseGuard(null);
+  }, [onRegisterCajaCloseGuard, view]);
 
   const stats = useMemo(() => {
     let sumCash = 0;
@@ -86,12 +100,17 @@ export function CashRegisterPanel({
     };
   }, [closings]);
 
-  const recent = closings.slice(0, 8);
+  const historyHint =
+    closings.length === 0 && !loading
+      ? "Sin reportes aún"
+      : loading
+        ? "Cargando…"
+        : `${closings.length} reporte${closings.length === 1 ? "" : "s"}`;
 
-  return (
+  const mainBody = (
     <div className="space-y-4">
       <p className="text-xs text-slate-400">
-        Resumen desde reportes guardados. Para registrar un turno nuevo usa la vista completa.
+        Resumen desde reportes guardados. Registra ingresos fuera de la web para que cuadren con estadísticas.
       </p>
 
       <div className="flex flex-col gap-3">
@@ -136,68 +155,77 @@ export function CashRegisterPanel({
         </div>
       )}
 
-      <Link
-        href="/dashboard/caja"
-        className="flex min-h-[48px] w-full items-center justify-center rounded-2xl bg-gradient-to-r from-purple-500 to-fuchsia-600 px-4 py-3 text-sm font-bold text-white shadow-lg"
-      >
-        Nuevo reporte, cierre y arqueo (completo)
-      </Link>
-
-      <div>
-        <p className="mb-2 text-[11px] font-medium uppercase text-slate-500">Historial reciente</p>
-        <ul className="space-y-2">
-          {recent.length === 0 && !loading ? (
-            <li className="text-xs text-slate-500">Aún no hay cierres registrados.</li>
-          ) : null}
-          {recent.map((r) => (
-            <li
-              key={r.id}
-              className="flex items-center justify-between gap-2 rounded-lg border border-white/[0.06] bg-black/20 px-3 py-2"
-            >
-              <span className="min-w-0 truncate text-xs text-slate-400">
-                {r.createdAt
-                  ? new Date(r.createdAt).toLocaleString("es-ES", {
-                      day: "2-digit",
-                      month: "short",
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })
-                  : "—"}
-              </span>
-              <span className="shrink-0 text-sm font-semibold tabular-nums text-white">
-                {formatMoney(Number(r.grandTotal ?? 0))}
-              </span>
-            </li>
-          ))}
-        </ul>
-      </div>
-
-      <div className="flex flex-wrap gap-2">
-        <Link
-          href="/dashboard/caja"
-          className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-zinc-900/80 px-3 py-2 text-xs font-medium text-white"
-        >
-          <Lock className="h-3.5 w-3.5" aria-hidden />
-          Cierre de turno
-        </Link>
-        <Link
-          href="/dashboard/caja"
-          className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-zinc-900/80 px-3 py-2 text-xs font-medium text-white"
-        >
-          <Archive className="h-3.5 w-3.5" aria-hidden />
-          Arqueo
-        </Link>
-        <Link
-          href="/dashboard/caja"
-          className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-zinc-900/80 px-3 py-2 text-xs font-medium text-amber-200"
-        >
-          <AlertTriangle className="h-3.5 w-3.5" aria-hidden />
-          Alertas de caja
-        </Link>
-      </div>
-
-      <PanelFooterLinks area={area} items={area.items} opsAlertCount={opsAlertCount} />
+      {venueId ? (
+        <div className="space-y-3">
+          <MobilePanelRow
+            Icon={Receipt}
+            label="Nuevo reporte por origen"
+            hint="Taquilla, mesa y bar · no pasó por la web"
+            tone="caja"
+            onRowClick={() => setView("newReport")}
+          />
+          <MobilePanelRow
+            Icon={FileText}
+            label="Historial de reportes"
+            hint={historyHint}
+            tone="caja"
+            onRowClick={() => setView("history")}
+          />
+        </div>
+      ) : null}
     </div>
+  );
+
+  const showNew = Boolean(venueId && view === "newReport");
+  const showHist = Boolean(venueId && view === "history");
+
+  return (
+    <AnimatePresence mode="wait">
+      {showNew ? (
+        <motion.div
+          key="caja-new-report"
+          variants={fadeSlide}
+          initial="initial"
+          animate="animate"
+          exit="exit"
+          className="space-y-3"
+        >
+          <CashNewReportFlow
+            venueId={venueId!}
+            onBack={() => setView("main")}
+            onSaved={() => void load()}
+          />
+        </motion.div>
+      ) : showHist ? (
+        <motion.div
+          key="caja-history"
+          variants={fadeSlide}
+          initial="initial"
+          animate="animate"
+          exit="exit"
+          className="space-y-3"
+        >
+          <CashReportHistoryFlow
+            closings={closings}
+            loading={loading}
+            venueId={venueId ?? ""}
+            onBack={() => setView("main")}
+            onDeleted={() => void load()}
+          />
+        </motion.div>
+      ) : (
+        <motion.div
+          key="caja-main"
+          variants={fadeSlide}
+          initial="initial"
+          animate="animate"
+          exit="exit"
+          className="space-y-3"
+        >
+          {mainBody}
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }
 

@@ -39,8 +39,8 @@ export function DashboardSidebar({
 }) {
   const path = usePathname();
 
-  function logout() {
-    clearAuthToken();
+  async function logout() {
+    await clearAuthToken();
     localStorage.removeItem("gozalo_dashboard_venue_id");
     window.location.href = "/login";
   }
@@ -49,7 +49,7 @@ export function DashboardSidebar({
     <div className="flex h-full flex-col border-r border-white/[0.06] bg-[#06060f]/95 backdrop-blur-xl">
       <div className="border-b border-white/[0.06] px-4 py-5">
         <div className="origin-left scale-90">
-          <LogoG onNavigate={onNavigate} />
+          <LogoG href="/dashboard" onNavigate={onNavigate} />
         </div>
         <p className="mt-3 truncate text-sm font-semibold text-gozalo-cream">{venueName}</p>
         <p className="text-xs text-slate-500">

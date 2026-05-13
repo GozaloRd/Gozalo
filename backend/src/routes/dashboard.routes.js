@@ -34,10 +34,13 @@ router.put('/tables/:id', dashboardCtrl.updateDashboardTable);
 router.delete('/tables/:id', dashboardCtrl.deactivateDashboardTable);
 
 router.get('/orders/by-table', posCtrl.ordersByTable);
+router.get('/orders/summary', posCtrl.getDashboardOrdersSummary);
 router.get('/orders', posCtrl.listDashboardOrders);
 router.post('/orders', posCtrl.createDashboardOrder);
 router.post('/orders/:orderId/items', posCtrl.addDashboardOrderItems);
 router.post('/orders/:orderId/close', posCtrl.closeDashboardOrder);
+router.post('/orders/:orderId/resend-email', posCtrl.resendOrderEmail);
+router.post('/orders/:orderId/refund', posCtrl.refundDashboardOrder);
 
 router.get('/staff/sales', dashboardCtrl.staffSales);
 router.get('/staff', dashboardCtrl.listStaff);
@@ -46,9 +49,11 @@ router.delete('/staff/:id', dashboardCtrl.removeStaff);
 
 router.get('/reports', dashboardCtrl.getReports);
 router.get('/analytics', dashboardCtrl.getAnalytics);
+router.get('/sales-metrics', dashboardCtrl.getSalesPanelMetrics);
 
 router.get('/cash-closing', dashboardCtrl.listCashClosings);
 router.post('/cash-closing', dashboardCtrl.createCashClosing);
+router.delete('/cash-closing/:id', dashboardCtrl.deleteCashClosing);
 
 // Guestlist VIP / cortesías por evento
 router.get('/events/:eventId/guestlist', guestlistCtrl.list);

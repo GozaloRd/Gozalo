@@ -3,8 +3,8 @@ const reservationsService = require('../services/reservations.service');
 async function createReservation(req, res) {
   try {
     const result = await reservationsService.createReservation({
-      user: req.user,
-      userId: req.userId,
+      user: req.user ?? null,
+      userId: req.userId ?? null,
       body: req.body,
     });
     return res.status(201).json(result);

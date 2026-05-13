@@ -1,10 +1,6 @@
-import { AdminSidebar } from "@/components/AdminSidebar";
+import { redirect } from "next/navigation";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="flex min-h-screen bg-night-900">
-      <AdminSidebar />
-      <div className="flex-1 overflow-auto">{children}</div>
-    </div>
-  );
+  redirect("/dashboard/admin");
+  return children;
 }

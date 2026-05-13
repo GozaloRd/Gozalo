@@ -88,9 +88,73 @@ async function listOpenOrders(req, res) {
 
 async function listDashboardOrders(req, res) {
   try {
-    return res.json(await posService.listDashboardOrders({ venueId: req.venueId, eventId: req.query.eventId || null }));
+    return res.json(
+      await posService.listDashboardOrders({
+        venueId: req.venueId,
+        eventId: req.query.eventId || null,
+        limit: req.query.limit,
+        offset: req.query.offset,
+        statusFilter: req.query.status || 'all',
+        period: req.query.period || 'all',
+        typeFilter: req.query.type || 'all',
+        search: req.query.q || '',
+      })
+    );
   } catch (e) {
-    return res.status(500).json({ error: 'Error al listar órdenes' });
+    console.error('[listDashboardOrders]', e);
+    const detail =
+      e.parent?.message ||
+      e.original?.message ||
+      e.message ||
+      'Error al listar órdenes';
+    const expose =
+      process.env.NODE_ENV !== 'production' || process.env.EXPOSE_DB_ERRORS === '1';
+    return res.status(500).json({
+      error: expose ? detail : 'Error al listar órdenes',
+    });
+  }
+}
+
+async function getDashboardOrdersSummary(req, res) {
+  try {
+    return res.json(
+      await posService.getDashboardOrdersSummary({
+        venueId: req.venueId,
+        eventId: req.query.eventId || null,
+        period: req.query.period || 'today',
+      })
+    );
+  } catch (e) {
+    return res.status(500).json({ error: 'Error al resumir órdenes' });
+  }
+}
+
+async function resendOrderEmail(req, res) {
+  try {
+    return res.json(
+      await posService.resendOrderEmail({
+        venueId: req.venueId,
+        orderId: req.params.orderId,
+      })
+    );
+  } catch (e) {
+    return res.status(e.status || 500).json({ error: e.status ? e.message : 'Error al reenviar email' });
+  }
+}
+
+async function refundDashboardOrder(req, res) {
+  try {
+    return res.json(
+      await posService.refundDashboardOrder({
+        venueId: req.venueId,
+        orderId: req.params.orderId,
+        userId: req.userId,
+        userRole: req.user.role,
+        reason: req.body?.reason,
+      })
+    );
+  } catch (e) {
+    return res.status(e.status || 500).json({ error: e.status ? e.message : 'Error al reembolsar' });
   }
 }
 
@@ -152,6 +216,9 @@ module.exports = {
   payOrder,
   listOpenOrders,
   listDashboardOrders,
+  getDashboardOrdersSummary,
+  resendOrderEmail,
+  refundDashboardOrder,
   createDashboardOrder,
   addDashboardOrderItems,
   closeDashboardOrder,

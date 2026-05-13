@@ -57,6 +57,32 @@ async function revenueByVenue(req, res) {
   }
 }
 
+async function venueDetail(req, res) {
+  try {
+    const { from, to } = req.query;
+    return res.json(await adminService.venueDetail({ venueId: req.params.id, from, to }));
+  } catch (e) {
+    return res.status(e.status || 500).json({ error: e.status ? e.message : 'Error al cargar detalle del local' });
+  }
+}
+
+async function events(req, res) {
+  try {
+    const { from, to, status, q, limit } = req.query;
+    return res.json(await adminService.listGlobalEvents({ from, to, status, q, limit }));
+  } catch (e) {
+    return res.status(500).json({ error: 'Error al listar eventos' });
+  }
+}
+
+async function eventSalesDetail(req, res) {
+  try {
+    return res.json(await adminService.eventSalesDetail({ eventId: req.params.id }));
+  } catch (e) {
+    return res.status(e.status || 500).json({ error: e.status ? e.message : 'Error al cargar ventas del evento' });
+  }
+}
+
 module.exports = {
   dashboard,
   pendingVenues,
@@ -65,4 +91,7 @@ module.exports = {
   deleteUser,
   transactions,
   revenueByVenue,
+  venueDetail,
+  events,
+  eventSalesDetail,
 };

@@ -4,6 +4,9 @@ const registerValidator = [
   body('email').isEmail().normalizeEmail(),
   body('password').isLength({ min: 6 }),
   body('fullName').trim().notEmpty(),
+  body('phone').optional().isString().trim(),
+  body('city').optional().isString().trim(),
+  body('country').optional().isString().trim(),
 ];
 
 const loginValidator = [

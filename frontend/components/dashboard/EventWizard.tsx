@@ -49,12 +49,15 @@ type Props = {
     requiresCoverForTable?: boolean;
     includeInCollage?: boolean;
     status?: string;
+    ticketSaleMode?: string;
     ticketTypes?: {
       name: string;
       price: number | string;
       quantityTotal?: number | null;
       showQuantityPublic?: boolean;
       description?: string | null;
+      sortOrder?: number;
+      active?: boolean;
     }[];
     images?: string[] | null;
     /** Plano/foto del salón para reservas de mesa */
@@ -97,6 +100,10 @@ export function EventWizard({ venueId, venueCity, embedded = false, initial, onC
     if (s === "published" || s === "paused" || s === "draft") return s;
     return "draft";
   });
+
+  const [ticketAutoQueue, setTicketAutoQueue] = useState(
+    () => String(initial?.ticketSaleMode ?? "").toLowerCase() === "sequential"
+  );
 
   const [ticketRows, setTicketRows] = useState<TicketRow[]>(() => {
     const tt = initial?.ticketTypes?.length
@@ -168,15 +175,15 @@ export function EventWizard({ venueId, venueCity, embedded = false, initial, onC
   }
 
   async function persistEventDraft(): Promise<string> {
-    const ticketTypes = ticketRows
-      .filter((r) => r.name.trim())
-      .map((r) => ({
-        name: r.name.trim(),
-        price: parseFloat(r.price),
-        quantityTotal: r.quantityTotal ? parseInt(r.quantityTotal, 10) : null,
-        showQuantityPublic: r.showQuantityPublic,
-        description: r.description.trim() || undefined,
-      }));
+    const filtered = ticketRows.filter((r) => r.name.trim());
+    const ticketTypes = filtered.map((r, idx) => ({
+      name: r.name.trim(),
+      price: parseFloat(r.price),
+      quantityTotal: r.quantityTotal ? parseInt(r.quantityTotal, 10) : null,
+      showQuantityPublic: r.showQuantityPublic,
+      description: r.description.trim() || undefined,
+      sortOrder: idx,
+    }));
 
     const body = {
       title: title.trim(),
@@ -192,6 +199,7 @@ export function EventWizard({ venueId, venueCity, embedded = false, initial, onC
       status: "draft" as const,
       featured,
       includeInCollage,
+      ticketSaleMode: ticketAutoQueue ? "sequential" : "parallel",
       ticketTypes,
     };
 
@@ -503,8 +511,25 @@ export function EventWizard({ venueId, venueCity, embedded = false, initial, onC
             <p className="text-sm text-[#D4C2EE]">
               Define uno o más tipos de entrada. Puedes dejar cantidad vacía para cupo abierto.
             </p>
+            <label className="flex cursor-pointer items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.03] px-3 py-3">
+              <input
+                type="checkbox"
+                checked={ticketAutoQueue}
+                onChange={(e) => setTicketAutoQueue(e.target.checked)}
+                className="rounded border-white/20"
+              />
+              <span className="text-sm text-slate-200">
+                <span className="font-semibold text-white">Activación automática</span>
+                <span className="mt-0.5 block text-xs text-slate-400">
+                  Si está activa, al agotarse un tipo el siguiente pasa a la venta (cola). Si no, todos se venden a la vez.
+                </span>
+              </span>
+            </label>
             {ticketRows.map((row, i) => (
               <div key={i} className="rounded-2xl border border-white/10 bg-white/[0.02] p-3">
+                <p className="mb-2 text-xs font-medium text-amber-200/90">
+                  {i === 0 ? "1️⃣" : i === 1 ? "2️⃣" : i === 2 ? "3️⃣" : `${i + 1}.`} Orden en cola
+                </p>
                 <div className="grid gap-2 sm:grid-cols-3">
                   <input
                     placeholder="Nombre (ej. VIP)"

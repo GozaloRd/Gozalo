@@ -14,6 +14,8 @@ export type UpcomingEventModel = {
   title: string;
   startAt: string;
   endAt: string;
+  /** `parallel` | `sequential` — cola de tipos de ticket. */
+  ticketSaleMode?: "parallel" | "sequential" | string;
   status?: string;
   coverImageUrl?: string | null;
   maxCapacity?: number | null;
@@ -130,7 +132,7 @@ export function UpcomingEventCard({
               FINALIZADO
             </span>
           ) : (
-            <span className="rounded-full bg-purple-500/20 px-2 py-0.5 text-[10px] font-semibold text-purple-400">
+            <span className="gozalo-badge-proximo rounded-full border border-[rgba(168,85,247,0.4)] bg-gradient-to-r from-purple-500/20 to-pink-500/20 px-2 py-0.5 text-[10px] font-semibold text-purple-300 shadow-[0_0_12px_rgba(168,85,247,0.2)]">
               PRÓXIMO
             </span>
           )}

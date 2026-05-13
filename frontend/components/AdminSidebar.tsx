@@ -16,7 +16,7 @@ export function AdminSidebar() {
   return (
     <aside className="flex w-56 shrink-0 flex-col border-r border-white/5 bg-night-950 py-6">
       <div className="px-4">
-        <LogoG />
+        <LogoG href="/admin" />
         <p className="mt-2 text-xs uppercase tracking-wider text-gozalo-blue">Admin Gózalo</p>
       </div>
       <nav className="mt-8 flex flex-col gap-1 px-2">

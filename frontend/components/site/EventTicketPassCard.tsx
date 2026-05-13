@@ -65,7 +65,7 @@ export type EventTicketPassCardProps = {
   qrPayload?: string | null;
   /** Tema de pie (SSR opcional) para alinear con EventPosterCard. */
   serverFooterTheme?: EventImageFooterTheme | null;
-  /** Enlace al evento (ficha) — típ. /eventos/[slug] */
+  /** Enlace al evento (ficha) — típ. /e/[slug] */
   eventHref?: string;
   /** Para capturas/export PNG: usar &lt;img&gt; permite CORS y html2canvas. */
   preferImgElement?: boolean;
@@ -140,7 +140,7 @@ export function EventTicketPassCard({
       <div className="p-2 pt-2.5 sm:p-2.5 sm:pt-3">
         <div
           data-ticket-pass-poster
-          className="relative w-full max-w-full overflow-hidden rounded-2xl bg-[#12121a]"
+          className="relative w-full max-w-full overflow-hidden rounded-2xl border-2 border-white bg-[#12121a]"
           style={{ aspectRatio: "3 / 4", maxHeight: "min(58vh, 360px)" }}
         >
           {hasImage ? (

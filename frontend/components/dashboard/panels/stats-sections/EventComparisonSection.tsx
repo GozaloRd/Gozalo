@@ -216,7 +216,7 @@ export function EventComparisonSection() {
                   ))}
                 </tr>
                 <tr className="border-t border-white/[0.06]">
-                  <td className="px-2 py-2">Ticket prom.</td>
+                  <td className="px-2 py-2">Ingreso prom. por asistencia</td>
                   {compareList.map((r) => (
                     <td key={r.eventId} className="px-2 py-2 tabular-nums">
                       <span className="inline-flex items-center gap-1">

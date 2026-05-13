@@ -133,7 +133,7 @@ export function ProfileTicketPass({ ticket, history }: Props) {
 
       <div className="mt-2 flex flex-col gap-2 border-t border-white/5 pt-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
         <Link
-          href={e?.slug ? `/eventos/${e.slug}` : "/eventos"}
+          href={e?.slug ? `/e/${e.slug}` : "/eventos"}
           className="rounded-xl border border-white/20 px-4 py-2 text-center text-xs font-semibold text-white hover:bg-white/5"
         >
           Ver detalle del evento

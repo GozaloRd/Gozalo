@@ -348,8 +348,8 @@ export default function DashboardConfigPage() {
     [venue?.id, JSON.stringify(venue?.payoutProfile ?? null)]
   );
 
-  function handleLogout() {
-    clearAuthToken();
+  async function handleLogout() {
+    await clearAuthToken();
     router.replace("/login");
   }
 

@@ -38,6 +38,8 @@ export type PublicEventsResponse = {
 };
 
 export type PublicEventDetail = PublicEventListItem & {
+  /** Venta en paralelo o en cola secuencial por `sortOrder` de tipos. */
+  ticketSaleMode?: "parallel" | "sequential" | string;
   description?: string;
   /** Plano o foto del salón (mesas reservables), si el local la subió */
   tableLayoutImageUrl?: string | null;
@@ -60,6 +62,8 @@ export type PublicEventDetail = PublicEventListItem & {
     name: string;
     price: number | string;
     quantityTotal?: number | null;
+    soldCount?: number;
+    sortOrder?: number;
     /** Si false, no se muestra cupo al público (ficha/checkout). */
     showQuantityPublic?: boolean;
     active?: boolean;

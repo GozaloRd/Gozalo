@@ -45,6 +45,17 @@ export function useEventTablesDetail(
       return;
     }
     void load();
+    const id = window.setInterval(() => {
+      void load();
+    }, 20_000);
+    const onFocus = () => {
+      void load();
+    };
+    window.addEventListener("focus", onFocus);
+    return () => {
+      window.clearInterval(id);
+      window.removeEventListener("focus", onFocus);
+    };
   }, [enabled, eventId, venueId, load]);
 
   return { tables, reservations, loading, error, reload: load };

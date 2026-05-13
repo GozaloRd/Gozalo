@@ -61,6 +61,7 @@ OrderItem.belongsTo(Product, { foreignKey: 'productId', as: 'product' });
 
 Payment.belongsTo(Order, { foreignKey: 'orderId', as: 'order' });
 Payment.belongsTo(Reservation, { foreignKey: 'reservationId', as: 'reservation' });
+Order.hasMany(Payment, { foreignKey: 'orderId', as: 'payments' });
 
 Event.hasMany(EventTicketType, { foreignKey: 'eventId', as: 'ticketTypes' });
 EventTicketType.belongsTo(Event, { foreignKey: 'eventId' });

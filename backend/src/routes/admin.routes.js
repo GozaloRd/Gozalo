@@ -14,5 +14,8 @@ router.patch('/users/:id/role', updateUserRoleValidator, validateRequest, adminC
 router.delete('/users/:id', adminController.deleteUser);
 router.get('/transactions', adminController.transactions);
 router.get('/revenue-by-venue', adminController.revenueByVenue);
+router.get('/events', adminController.events);
+router.get('/events/:id/sales', adminController.eventSalesDetail);
+router.get('/venues/:id/detail', adminController.venueDetail);
 
 module.exports = router;

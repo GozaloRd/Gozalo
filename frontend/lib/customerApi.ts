@@ -62,6 +62,9 @@ export type PurchasedTicket = {
 export async function purchaseTickets(input: {
   eventId: string;
   items: Array<{ ticketType: string; quantity: number; unitPrice: number }>;
+  /** Compra invitada (sin JWT): el backend crea o reutiliza usuario por email. */
+  buyerEmail?: string;
+  buyerFullName?: string;
 }) {
   return api<{ order: { id: string; total: number }; tickets: PurchasedTicket[] }>("/api/tickets/purchase", {
     method: "POST",
@@ -70,14 +73,27 @@ export async function purchaseTickets(input: {
 }
 
 export type ReservationBreakdown = {
+  paymentVersion?: number;
   table: { id: string; zone: string; label: string; capacity: number; amount: number };
   cover: { ticketType: string; quantity: number; unitPrice: number; amount: number } | null;
-  fee: number;
-  total: number;
+  /** Mesa + cover — ingreso base del local (sin recargo). */
+  subtotalLocal: number;
+  consumerSurchargeRate: number;
+  totalLocalContract: number;
+  /** Contrato cliente (base + 5% solo consumidor web). */
+  totalCustomerContract: number;
   paymentOption: "total" | "partial";
   upfrontPercent: number;
-  payNow: number;
+  payNowLocalBase: number;
+  payNowCustomer: number;
+  platformCommissionOnPayment: number;
+  pendingLocalBase: number;
+  /** @deprecated usar pendingLocalBase */
   pendingAtVenue: number;
+  /** Igual que totalCustomerContract */
+  total: number;
+  /** Igual que payNowCustomer — cobro online del tramo */
+  payNow: number;
 };
 
 export async function createReservation(input: {
@@ -88,6 +104,8 @@ export async function createReservation(input: {
   paymentOption: "total" | "partial";
   upfrontPercent?: number;
   cover?: { ticketType: string; quantity: number; unitPrice: number };
+  buyerEmail?: string;
+  buyerFullName?: string;
 }) {
   return api<{ reservation: { id: string; status: string }; qrImage?: string; breakdown: ReservationBreakdown }>(
     "/api/reservations",

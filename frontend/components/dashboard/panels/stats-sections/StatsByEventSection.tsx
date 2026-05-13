@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Bar,
@@ -89,13 +88,17 @@ export function StatsByEventSection() {
 
   const summary = ana?.summary as
     | {
-        tickets?: { total?: number };
+        tickets?: { total?: number; orders?: number };
+        reservations?: { total?: number };
         revenue?: { total?: number };
         occupancyCurrent?: { percentage?: number; maxCapacity?: number; currentAttendees?: number };
       }
     | undefined;
 
   const charts = ana?.charts as { salesByDay?: { day: string; total: number }[] } | undefined;
+  const revenueChannels = ana?.revenueChannels as
+    | { combined?: { entradas?: { total?: number }; mesas?: { total?: number }; consumo?: { total?: number } } }
+    | undefined;
   const salesByDay = charts?.salesByDay ?? [];
 
   const hourlyLike = useMemo(() => {
@@ -108,11 +111,14 @@ export function StatsByEventSection() {
   }, [salesByDay]);
 
   const ticketsSold = Number(summary?.tickets?.total ?? 0);
+  const ticketOrders = Number(summary?.tickets?.orders ?? ticketsSold);
+  const tablesReserved = Number(summary?.reservations?.total ?? 0);
   const cap = Number(summary?.occupancyCurrent?.maxCapacity ?? 0);
   const revenue = Number(summary?.revenue?.total ?? 0);
-  const avgTicket = ticketsSold > 0 ? revenue / ticketsSold : 0;
+  const ticketRevenue = Number(revenueChannels?.combined?.entradas?.total ?? 0);
+  const avgTicket = ticketsSold > 0 && ticketRevenue > 0 ? ticketRevenue / ticketsSold : 0;
   const occPct = Number(summary?.occupancyCurrent?.percentage ?? 0);
-  const ratioBar = cap > 0 ? Math.min(100, Math.round((ticketsSold / cap) * 100)) : 0;
+  const ratioBar = cap > 0 ? Math.min(100, Math.round(((ticketsSold + tablesReserved) / cap) * 100)) : 0;
 
   if (!venueId) {
     return <p className="text-sm text-slate-500">Selecciona un local.</p>;
@@ -144,8 +150,8 @@ export function StatsByEventSection() {
         <>
           <div className="grid grid-cols-2 gap-2">
             <MetricCard
-              label="Entradas / aforo"
-              value={`${ticketsSold} / ${cap || "—"}`}
+              label="Tickets / mesas"
+              value={`${ticketsSold} tickets · ${tablesReserved} mesas`}
             />
             <div className="col-span-2 rounded-xl bg-zinc-800/50 p-3">
               <p className="text-[10px] font-medium uppercase tracking-wide text-slate-500">Ocupación vs aforo</p>
@@ -155,7 +161,11 @@ export function StatsByEventSection() {
                   style={{ width: `${ratioBar}%` }}
                 />
               </div>
-              <p className="mt-1 text-xs text-slate-400">{ratioBar}% del aforo en entradas vendidas</p>
+              <p className="mt-1 text-xs text-slate-400">
+                {`${ticketOrders} compra${ticketOrders === 1 ? "" : "s"} de tickets${
+                  cap ? ` · ${ticketsSold + tablesReserved}/${cap} asignación total` : ""
+                }`}
+              </p>
             </div>
             <MetricCard label="Ingresos totales" value={formatMoney(revenue)} />
             <MetricCard label="Ticket promedio" value={avgTicket > 0 ? formatMoney(avgTicket) : "—"} />
@@ -207,12 +217,6 @@ export function StatsByEventSection() {
             </div>
           </div>
 
-          <Link
-            href="/dashboard/estadisticas"
-            className="flex min-h-[44px] w-full items-center justify-center rounded-xl border border-pink-500/40 bg-pink-500/10 px-4 py-3 text-sm font-semibold text-pink-200"
-          >
-            Ver detalle completo →
-          </Link>
         </>
       )}
     </div>

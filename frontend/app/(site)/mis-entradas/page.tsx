@@ -46,7 +46,7 @@ function PassRow({ t, archive }: { t: MyTicket; archive: boolean }) {
         priceLabel={fmt(t.unitPrice ?? 0)}
         qrImageUrl={showQr ? t.qrImage : null}
         qrPayload={showQr && !t.qrImage ? t.qrPayload : null}
-        eventHref={archive ? undefined : e?.slug ? `/eventos/${e.slug}` : undefined}
+        eventHref={archive ? undefined : e?.slug ? `/e/${e.slug}` : undefined}
         status={st}
         statusLabel={statusLabelFor(t.status)}
         className={archive ? "!opacity-[0.9] saturate-[0.88]" : ""}

@@ -3,16 +3,16 @@
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { DashCard } from "@/components/dashboard/pro/DashCard";
 import { useDashboard } from "@/contexts/DashboardContext";
-import { createCashClosing, fetchCashClosings, fetchDashboardEvents } from "@/lib/dashboardApi";
+import { createCashClosing, deleteCashClosing, fetchCashClosings, fetchDashboardEvents } from "@/lib/dashboardApi";
+import {
+  buildBreakdown,
+  channelTotal,
+  emptySlice,
+  sumBreakdown,
+  type BreakdownNums,
+  type MethodSlice,
+} from "@/lib/cashReportForm";
 import { formatMoney } from "@/lib/format";
-
-type MethodSlice = { cash: string; card: string; transfer: string };
-
-type BreakdownNums = {
-  entradas: { cash: number; card: number; transfer: number; other: number };
-  mesas: { cash: number; card: number; transfer: number; other: number };
-  consumo: { cash: number; card: number; transfer: number; other: number };
-};
 
 type ClosingRow = {
   id: string;
@@ -24,44 +24,6 @@ type ClosingRow = {
   closedBy?: { fullName?: string };
   metadata?: { breakdown?: BreakdownNums } | null;
 };
-
-const emptySlice = (): MethodSlice => ({ cash: "", card: "", transfer: "" });
-
-function parseSlice(s: MethodSlice) {
-  return {
-    cash: Math.max(0, Number(s.cash || 0)),
-    card: Math.max(0, Number(s.card || 0)),
-    transfer: Math.max(0, Number(s.transfer || 0)),
-    other: 0,
-  };
-}
-
-function buildBreakdown(e: MethodSlice, m: MethodSlice, c: MethodSlice): BreakdownNums {
-  return {
-    entradas: parseSlice(e),
-    mesas: parseSlice(m),
-    consumo: parseSlice(c),
-  };
-}
-
-function sumBreakdown(b: BreakdownNums) {
-  let cash = 0;
-  let card = 0;
-  let transfer = 0;
-  let other = 0;
-  for (const ch of Object.values(b)) {
-    cash += ch.cash;
-    card += ch.card;
-    transfer += ch.transfer;
-    other += ch.other;
-  }
-  return { cash, card, transfer, other, grand: cash + card + transfer + other };
-}
-
-function channelTotal(b: BreakdownNums, key: keyof BreakdownNums) {
-  const x = b[key];
-  return x.cash + x.card + x.transfer + x.other;
-}
 
 export default function DashboardCajaPage() {
   const { venueId } = useDashboard();
@@ -75,6 +37,7 @@ export default function DashboardCajaPage() {
   const [saving, setSaving] = useState(false);
   const [closings, setClosings] = useState<ClosingRow[]>([]);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!venueId) return;
@@ -163,6 +126,27 @@ export default function DashboardCajaPage() {
       alert(e instanceof Error ? e.message : "Error al guardar reporte");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function deleteClosing(id: string) {
+    if (!venueId) return;
+    if (
+      !window.confirm(
+        "¿Eliminar este reporte de caja? Los totales del historial y estadísticas se actualizarán. No se puede deshacer."
+      )
+    ) {
+      return;
+    }
+    setDeletingId(id);
+    try {
+      await deleteCashClosing(id, venueId);
+      setExpandedId((cur) => (cur === id ? null : cur));
+      await load();
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : "Error al eliminar el reporte");
+    } finally {
+      setDeletingId(null);
     }
   }
 
@@ -347,6 +331,7 @@ export default function DashboardCajaPage() {
           <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">
             Historial de reportes
           </p>
+          <p className="mt-1 text-xs text-slate-500">Puedes eliminar un registro si se creó por error.</p>
         </div>
         {loading ? (
           <p className="px-6 py-8 text-sm text-slate-500">Cargando reportes...</p>
@@ -364,7 +349,7 @@ export default function DashboardCajaPage() {
                   <th className="px-4 py-3">Mesas</th>
                   <th className="px-4 py-3">Consumo</th>
                   <th className="px-4 py-3">Por</th>
-                  <th className="px-4 py-3 w-24">Detalle</th>
+                  <th className="px-4 py-3 w-36">Detalle / acciones</th>
                 </tr>
               </thead>
               <tbody>
@@ -403,17 +388,25 @@ export default function DashboardCajaPage() {
                           <td className="px-4 py-3 text-slate-400">{ex("consumo")}</td>
                           <td className="px-4 py-3 text-slate-400">{c.closedBy?.fullName ?? "—"}</td>
                           <td className="px-4 py-3">
-                            {b ? (
+                            <div className="flex flex-wrap items-center gap-2">
+                              {b ? (
+                                <button
+                                  type="button"
+                                  className="text-xs text-[#9B7FCA] hover:underline"
+                                  onClick={() => setExpandedId(open ? null : c.id)}
+                                >
+                                  {open ? "Ocultar" : "Ver"}
+                                </button>
+                              ) : null}
                               <button
                                 type="button"
-                                className="text-xs text-[#9B7FCA] hover:underline"
-                                onClick={() => setExpandedId(open ? null : c.id)}
+                                disabled={deletingId === c.id}
+                                className="text-xs font-medium text-rose-400 hover:underline disabled:opacity-50"
+                                onClick={() => void deleteClosing(c.id)}
                               >
-                                {open ? "Ocultar" : "Ver"}
+                                {deletingId === c.id ? "Borrando…" : "Eliminar"}
                               </button>
-                            ) : (
-                              <span className="text-xs text-slate-600">—</span>
-                            )}
+                            </div>
                           </td>
                         </tr>
                         {open && b && (

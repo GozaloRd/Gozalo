@@ -67,7 +67,7 @@ export function ReservationCard({ reservation, history = false, onCancel }: Prop
           <p>Monto pendiente: {formatMoney(pending)}</p>
           <div className="pt-2 flex flex-wrap gap-2">
             <Link
-              href={reservation.event?.slug ? `/eventos/${reservation.event.slug}` : "/eventos"}
+              href={reservation.event?.slug ? `/e/${reservation.event.slug}` : "/eventos"}
               className="rounded-xl border border-white/20 px-4 py-2 text-xs font-semibold text-white hover:bg-white/5"
             >
               Ver detalle del evento

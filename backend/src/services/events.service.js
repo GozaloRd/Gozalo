@@ -300,6 +300,7 @@ async function getPublicEventById(id) {
   const j = event.toJSON();
   j.venue = j.venue ? { ...j.venue, logo: j.venue.coverImageUrl } : null;
   j.tables = tables;
+  j.ticketTypes = sortTicketTypesJson(j.ticketTypes || []);
   j.priceFrom = minTicketPrice(j.ticketTypes, j.basePrice);
   j.includeInCollage = !!j.includeInCollage;
   j.collageAuthorized = !!j.collageAuthorized;
@@ -329,6 +330,7 @@ async function getPublicEventBySlug(slug) {
   const j = event.toJSON();
   j.venue = j.venue ? { ...j.venue, logo: j.venue.coverImageUrl } : null;
   j.tables = tables;
+  j.ticketTypes = sortTicketTypesJson(j.ticketTypes || []);
   j.priceFrom = minTicketPrice(j.ticketTypes, j.basePrice);
   j.includeInCollage = !!j.includeInCollage;
   j.collageAuthorized = !!j.collageAuthorized;
@@ -519,6 +521,17 @@ function resolveTicketTypeSoldCount(soldMap, eventId, tt) {
   return Number(tt.soldCount) || 0;
 }
 
+/** Orden estable para UI y cola secuencial (sort_order, luego nombre). */
+function sortTicketTypesJson(types) {
+  if (!Array.isArray(types)) return [];
+  return [...types].sort((a, b) => {
+    const sa = Number(a.sortOrder ?? a.sort_order ?? 0);
+    const sb = Number(b.sortOrder ?? b.sort_order ?? 0);
+    if (sa !== sb) return sa - sb;
+    return String(a.name || '').localeCompare(String(b.name || ''), 'es');
+  });
+}
+
 async function listDashboardEvents({ venueId, scope = 'all' }) {
   const now = new Date();
   /** Eventos cancelados (= eliminados en panel) no deben aparecer en listas operativas. */
@@ -538,7 +551,7 @@ async function listDashboardEvents({ venueId, scope = 'all' }) {
   const data = await Promise.all(
     events.map(async (ev) => {
       const json = ev.toJSON();
-      const ticketTypes = (json.ticketTypes || []).map((tt) => ({
+      const ticketTypes = sortTicketTypesJson(json.ticketTypes || []).map((tt) => ({
         ...tt,
         soldCount: resolveTicketTypeSoldCount(soldMap, ev.id, tt),
       }));
@@ -580,6 +593,9 @@ async function createDashboardEvent({ venueId, body }) {
   const imagesPayload = images !== undefined ? (Array.isArray(images) ? images : null) : undefined;
   const includeInCollage = body.includeInCollage === false ? false : true;
 
+  const ticketSaleMode =
+    String(body.ticketSaleMode || '').toLowerCase() === 'sequential' ? 'sequential' : 'parallel';
+
   const ev = await Event.create({
     venueId,
     title,
@@ -601,11 +617,13 @@ async function createDashboardEvent({ venueId, body }) {
     destacado: destacadoFlag,
     includeInCollage,
     collageAuthorized: false,
+    ticketSaleMode,
+    wizardMeta: body.wizardMeta != null ? body.wizardMeta : null,
   });
 
   if (Array.isArray(ticketTypes) && ticketTypes.length) {
     await EventTicketType.bulkCreate(
-      ticketTypes.map((tt) => ({
+      ticketTypes.map((tt, idx) => ({
         eventId: ev.id,
         name: tt.name,
         code: tt.code || null,
@@ -614,6 +632,7 @@ async function createDashboardEvent({ venueId, body }) {
         quantityTotal: tt.quantityTotal ?? null,
         showQuantityPublic: tt.showQuantityPublic !== false,
         active: tt.active !== false,
+        sortOrder: tt.sortOrder != null ? Number(tt.sortOrder) : idx,
       }))
     );
   }
@@ -650,6 +669,8 @@ async function updateDashboardEvent({ venueId, eventId, body }) {
     'requiresCoverForTable',
     'includeInCollage',
     'collageAuthorized',
+    'ticketSaleMode',
+    'wizardMeta',
   ];
   for (const k of allowed) {
     if (body[k] !== undefined) {
@@ -659,6 +680,10 @@ async function updateDashboardEvent({ venueId, eventId, body }) {
         ev.collagePhotos = Array.isArray(body.collagePhotos)
           ? body.collagePhotos.filter((u) => typeof u === 'string' && u.trim())
           : [];
+      } else if (k === 'ticketSaleMode') {
+        ev.ticketSaleMode = String(body.ticketSaleMode).toLowerCase() === 'sequential' ? 'sequential' : 'parallel';
+      } else if (k === 'wizardMeta') {
+        ev.wizardMeta = body.wizardMeta == null ? null : body.wizardMeta;
       } else {
         ev[k] = body[k];
       }
@@ -681,7 +706,7 @@ async function updateDashboardEvent({ venueId, eventId, body }) {
   if (Array.isArray(body.ticketTypes)) {
     await EventTicketType.destroy({ where: { eventId: ev.id } });
     await EventTicketType.bulkCreate(
-      body.ticketTypes.map((tt) => ({
+      body.ticketTypes.map((tt, idx) => ({
         eventId: ev.id,
         name: tt.name,
         code: tt.code || null,
@@ -690,6 +715,7 @@ async function updateDashboardEvent({ venueId, eventId, body }) {
         quantityTotal: tt.quantityTotal ?? null,
         showQuantityPublic: tt.showQuantityPublic !== false,
         active: tt.active !== false,
+        sortOrder: tt.sortOrder != null ? Number(tt.sortOrder) : idx,
       }))
     );
   }

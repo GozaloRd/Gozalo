@@ -50,7 +50,7 @@ export function TicketCard({ ticket, history = false }: Props) {
           <p>Precio: {ticket.unitPrice != null ? formatMoney(Number(ticket.unitPrice)) : "—"}</p>
           <div className="pt-2">
             <Link
-              href={ticket.event?.slug ? `/eventos/${ticket.event.slug}` : "/eventos"}
+              href={ticket.event?.slug ? `/e/${ticket.event.slug}` : "/eventos"}
               className="rounded-xl border border-white/20 px-4 py-2 text-xs font-semibold text-white hover:bg-white/5"
             >
               Ver detalle del evento

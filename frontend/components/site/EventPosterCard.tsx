@@ -15,7 +15,7 @@ export type EventPosterCardData = {
   city?: string | null;
   venueName?: string | null;
   image?: string | null;
-  /** Ruta de destino al hacer click. Por defecto /eventos/[slug] */
+  /** Ruta de destino al hacer click. Por defecto /e/[slug] */
   href?: string;
   /** Tema del pie precalculado en el servidor (primer paint sin gris). */
   serverFooterTheme?: EventImageFooterTheme | null;
@@ -28,6 +28,8 @@ type Props = {
   /** Indice del card para diversificar tonalidades de placeholder */
   index?: number;
   className?: string;
+  /** Inicio: borde solo en el card; foto a sangría arriba (sin padding), esquinas curvas del card. */
+  variant?: "default" | "flush";
 };
 
 const PLACEHOLDER_GRADIENTS = [
@@ -89,11 +91,12 @@ export function EventPosterCard({
   size = "md",
   index = 0,
   className,
+  variant = "default",
 }: Props) {
   const [imgError, setImgError] = useState(false);
   const hasImage = !!event.image && !imgError;
   const gradient = PLACEHOLDER_GRADIENTS[index % PLACEHOLDER_GRADIENTS.length];
-  const href = event.href ?? `/eventos/${event.slug}`;
+  const href = event.href ?? `/e/${event.slug}`;
   const { day, month } = dateParts(event.startAt);
   const footerTheme = useEventImageFooterColor(
     event.image,
@@ -107,6 +110,48 @@ export function EventPosterCard({
       : size === "lg"
         ? "max-w-[320px]"
         : "max-w-[270px]";
+
+  const flush = variant === "flush";
+  const posterFrame = flush ? "" : "border-2 border-white";
+  const posterRound = flush ? "rounded-none" : "rounded-2xl";
+  const imgFitClass = flush
+    ? "object-cover object-top"
+    : "object-cover object-center";
+
+  const posterContent = (
+    <>
+      {hasImage ? (
+        <Image
+          src={event.image as string}
+          alt={event.title}
+          fill
+          sizes="(max-width: 768px) 48vw, 320px"
+          className={`${imgFitClass} transition-transform duration-700 ease-out group-hover:scale-[1.03]`}
+          onError={() => setImgError(true)}
+        />
+      ) : (
+        <div className={`absolute inset-0 bg-gradient-to-br ${gradient}`}>
+          <div className="absolute inset-0 flex items-center justify-center p-6 text-center">
+            <span className="line-clamp-4 text-2xl font-bold uppercase leading-tight tracking-tight text-white/95 drop-shadow-[0_2px_12px_rgba(0,0,0,0.6)]">
+              {event.title}
+            </span>
+          </div>
+        </div>
+      )}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 bottom-0 h-[18%] bg-gradient-to-t from-black/30 via-black/5 to-transparent"
+      />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-500 group-hover:opacity-100"
+        style={{
+          background:
+            "linear-gradient(125deg, transparent 45%, rgba(255,255,255,0.1) 50%, transparent 55%)",
+        }}
+      />
+    </>
+  );
 
   return (
     <Link
@@ -131,48 +176,32 @@ export function EventPosterCard({
       )}
 
       <div className="relative overflow-hidden rounded-[2rem] border-2 border-white bg-[#2a2a32] shadow-[0_20px_50px_rgba(0,0,0,0.5)] transition-transform duration-500 group-hover:-translate-y-1">
-        {/* Póster: prioridad a la foto, márgenes mínimos, proporción cartel vertical */}
-        <div className="p-2 pt-2.5 sm:p-2.5 sm:pt-3">
+        {/* flush: foto a sangría con el borde del card; el padre redondea arriba (overflow-hidden). */}
+        {flush ? (
           <div
-            className="relative w-full max-w-full overflow-hidden rounded-2xl bg-[#12121a]"
+            className="relative w-full overflow-hidden bg-[#12121a]"
             style={{ aspectRatio: "3 / 4" }}
           >
-            {hasImage ? (
-              <Image
-                src={event.image as string}
-                alt={event.title}
-                fill
-                sizes="(max-width: 768px) 48vw, 320px"
-                className="object-cover object-center transition-transform duration-700 ease-out group-hover:scale-[1.03]"
-                onError={() => setImgError(true)}
-              />
-            ) : (
-              <div
-                className={`absolute inset-0 bg-gradient-to-br ${gradient}`}
-              >
-                <div className="absolute inset-0 flex items-center justify-center p-6 text-center">
-                  <span className="line-clamp-4 text-2xl font-bold uppercase leading-tight tracking-tight text-white/95 drop-shadow-[0_2px_12px_rgba(0,0,0,0.6)]">
-                    {event.title}
-                  </span>
-                </div>
-              </div>
-            )}
-            <div
-              aria-hidden
-              className="pointer-events-none absolute inset-x-0 bottom-0 h-[18%] bg-gradient-to-t from-black/30 via-black/5 to-transparent"
-            />
-            <div
-              aria-hidden
-              className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-500 group-hover:opacity-100"
-              style={{
-                background:
-                  "linear-gradient(125deg, transparent 45%, rgba(255,255,255,0.1) 50%, transparent 55%)",
-              }}
-            />
+            {posterContent}
           </div>
-        </div>
+        ) : (
+          <div className="p-2 pt-2.5 sm:p-2.5 sm:pt-3">
+            <div
+              className={`relative w-full max-w-full overflow-hidden bg-[#12121a] ${posterRound} ${posterFrame}`}
+              style={{ aspectRatio: "3 / 4" }}
+            >
+              {posterContent}
+            </div>
+          </div>
+        )}
 
-        <div className="px-3 pb-1 pt-0 sm:px-3.5 sm:pb-1.5">
+        <div
+          className={
+            flush
+              ? "px-3 pb-1 pt-2 sm:px-3.5 sm:pb-1.5 sm:pt-2.5"
+              : "px-3 pb-1 pt-0 sm:px-3.5 sm:pb-1.5"
+          }
+        >
           <h3 className="line-clamp-2 text-[0.95rem] font-bold leading-tight tracking-tight text-white sm:text-base">
             {event.title}
           </h3>

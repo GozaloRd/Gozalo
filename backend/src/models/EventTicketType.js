@@ -18,6 +18,8 @@ const EventTicketType = sequelize.define(
     /** Si false, no se muestra el cupo al público (sigue aplicando en servidor al comprar). */
     showQuantityPublic: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: true },
     soldCount: { type: DataTypes.INTEGER, defaultValue: 0 },
+    /** Orden en modo `sequential` del evento (menor = antes en cola). */
+    sortOrder: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
     active: { type: DataTypes.BOOLEAN, defaultValue: true },
   },
   { tableName: 'event_ticket_types' }

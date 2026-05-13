@@ -19,13 +19,15 @@ function toMePayload(user) {
     email: user.email,
     fullName: user.fullName,
     phone: user.phone,
+    city: user.city ?? null,
+    country: user.country ?? null,
     role: user.role,
     points: user.points,
     avatarUrl: user.avatarUrl,
   };
 }
 
-async function registerUser({ email, password, fullName, phone, role }) {
+async function registerUser({ email, password, fullName, phone, role, city, country }) {
   const exists = await User.findOne({ where: { email } });
   if (exists) {
     const err = new Error('El correo ya está registrado');
@@ -35,11 +37,15 @@ async function registerUser({ email, password, fullName, phone, role }) {
 
   const passwordHash = await bcrypt.hash(password, 10);
   const allowedRoles = ['customer', 'venue_owner'];
+  const cityTrim = city != null && String(city).trim() ? String(city).trim() : null;
+  const countryTrim = country != null && String(country).trim() ? String(country).trim() : null;
   const user = await User.create({
     email,
     passwordHash,
     fullName,
     phone: phone || null,
+    city: cityTrim,
+    country: countryTrim,
     role: allowedRoles.includes(role) ? role : 'customer',
   });
 
@@ -65,7 +71,7 @@ async function getMyProfile(user) {
   return toMePayload(user);
 }
 
-async function updateMyProfile(userId, { fullName, phone, avatarUrl }) {
+async function updateMyProfile(userId, { fullName, phone, avatarUrl, city, country }) {
   const user = await User.findByPk(userId);
   if (!user) {
     const err = new Error('No encontrado');
@@ -78,6 +84,9 @@ async function updateMyProfile(userId, { fullName, phone, avatarUrl }) {
   }
   if (phone !== undefined) user.phone = phone || null;
   if (avatarUrl !== undefined) user.avatarUrl = avatarUrl || null;
+  if (city !== undefined) user.city = city != null && String(city).trim() ? String(city).trim() : null;
+  if (country !== undefined)
+    user.country = country != null && String(country).trim() ? String(country).trim() : null;
 
   await user.save();
   return toMePayload(user);

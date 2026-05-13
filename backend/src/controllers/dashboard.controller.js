@@ -99,6 +99,14 @@ async function getAnalytics(req, res) {
   }
 }
 
+async function getSalesPanelMetrics(req, res) {
+  try {
+    return res.json(await dashboardService.getSalesPanelMetrics({ venueId: req.venueId }));
+  } catch (e) {
+    return res.status(500).json({ error: 'Error al calcular ventas' });
+  }
+}
+
 async function listCashClosings(req, res) {
   try {
     return res.json(await dashboardService.listCashClosings({ venueId: req.venueId }));
@@ -117,6 +125,19 @@ async function createCashClosing(req, res) {
   }
 }
 
+async function deleteCashClosing(req, res) {
+  try {
+    const r = await dashboardService.deleteCashClosing({
+      venueId: req.venueId,
+      closingId: req.params.id,
+    });
+    if (!r.deleted) return res.status(404).json({ error: 'Reporte no encontrado' });
+    return res.json({ ok: true });
+  } catch (e) {
+    return res.status(500).json({ error: 'Error al eliminar reporte' });
+  }
+}
+
 module.exports = {
   getMineVenue,
   getStats,
@@ -130,6 +151,8 @@ module.exports = {
   staffSales,
   getReports,
   getAnalytics,
+  getSalesPanelMetrics,
   listCashClosings,
   createCashClosing,
+  deleteCashClosing,
 };

@@ -9,6 +9,8 @@ const createReservationValidator = [
   body('cover.ticketType').optional().isString().isLength({ min: 1, max: 120 }),
   body('cover.quantity').optional().isInt({ min: 1, max: 100 }),
   body('cover.unitPrice').optional().isFloat({ min: 0 }),
+  body('buyerEmail').optional({ values: 'falsy' }).isEmail(),
+  body('buyerFullName').optional({ values: 'falsy' }).trim().isLength({ min: 1, max: 160 }),
 ];
 
 const updateReservationStatusValidator = [

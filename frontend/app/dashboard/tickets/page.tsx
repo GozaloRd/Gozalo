@@ -26,7 +26,7 @@ export default function DashboardTicketsPage() {
   useEffect(() => {
     if (!venueId) return;
     let cancelled = false;
-    (async () => {
+    const loadNow = async () => {
       try {
         const res = (await fetchDashboardEvents("all", venueId)) as { data?: Ev[] };
         const rows = (res.data ?? []).filter((ev) => ev.status !== "cancelled");
@@ -36,9 +36,19 @@ export default function DashboardTicketsPage() {
       } finally {
         if (!cancelled) setLoading(false);
       }
-    })();
+    };
+    void loadNow();
+    const id = window.setInterval(() => {
+      void loadNow();
+    }, 20_000);
+    const onFocus = () => {
+      void loadNow();
+    };
+    window.addEventListener("focus", onFocus);
     return () => {
       cancelled = true;
+      window.clearInterval(id);
+      window.removeEventListener("focus", onFocus);
     };
   }, [venueId]);
 

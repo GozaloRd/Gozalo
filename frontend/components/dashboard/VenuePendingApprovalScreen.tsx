@@ -28,7 +28,7 @@ export function VenuePendingApprovalScreen({ venueName, status, onRefresh, refre
       />
 
       <div className="relative z-10 flex w-full max-w-lg flex-col items-center text-center">
-        <LogoG />
+        <LogoG href="/dashboard" />
         <div className="mt-10 w-full rounded-3xl border border-white/[0.12] bg-gradient-to-b from-[#15121F]/95 to-[#0d0d14]/95 p-8 shadow-[0_0_80px_rgba(123,44,191,0.15)] backdrop-blur-md md:p-10">
           <div
             className={`mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-2xl border ${

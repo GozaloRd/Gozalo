@@ -28,7 +28,12 @@ function decodeJwtPayload(token: string): Record<string, unknown> | null {
   try {
     const normalized = parts[1].replace(/-/g, "+").replace(/_/g, "/");
     const padded = normalized + "=".repeat((4 - (normalized.length % 4 || 4)) % 4);
-    const json = atob(padded);
+    const binary = atob(padded);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i += 1) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    const json = new TextDecoder("utf-8", { fatal: false }).decode(bytes);
     return JSON.parse(json) as Record<string, unknown>;
   } catch {
     return null;
@@ -57,6 +62,7 @@ function isPublicBypass(pathname: string): boolean {
     pathname === "/registro" ||
     pathname === "/eventos" ||
     pathname.startsWith("/eventos/") ||
+    pathname.startsWith("/e/") ||
     pathname === "/collage" ||
     pathname.startsWith("/collage/") ||
     pathname.startsWith("/_next") ||
@@ -70,16 +76,16 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   if (isPublicBypass(pathname)) return NextResponse.next();
 
-  const token = getTokenFromRequest(request);
-  const role = getRole(request);
-  const isProtected =
-    pathname.startsWith("/checkout/") || pathname.startsWith("/reservar/") || pathname.startsWith("/dashboard");
-
-  if (isProtected && !token) {
-    return redirectTo(request, "/login");
+  // Checkout / reservar: el token suele estar solo en localStorage; el gate es en cliente.
+  if (!pathname.startsWith("/dashboard")) {
+    return NextResponse.next();
   }
 
-  if (!pathname.startsWith("/dashboard")) {
+  const token = getTokenFromRequest(request);
+  const role = token ? getRole(request) : null;
+
+  // Sin cookie en el servidor: permitir HTML; VenueOwnerDashboardRoot / *AuthGate validan con localStorage + /me.
+  if (!token) {
     return NextResponse.next();
   }
 
@@ -108,5 +114,10 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/dashboard/:path*", "/checkout/:path*", "/reservar/:path*"],
+  matcher: [
+    "/dashboard",
+    "/dashboard/:path*",
+    "/checkout/:path*",
+    "/reservar/:path*",
+  ],
 };

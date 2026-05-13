@@ -91,15 +91,12 @@ export default function RootLayout({
 }>) {
 
   return (
-
     <html lang="es" className={`${inter.variable} ${playfair.variable} ${logoMark.variable}`}>
-
-      <GoogleTags />
-
-      <body className="font-sans min-h-screen antialiased">{children}</body>
-
+      <body className="font-sans min-h-screen antialiased">
+        <GoogleTags />
+        {children}
+      </body>
     </html>
-
   );
 
 }

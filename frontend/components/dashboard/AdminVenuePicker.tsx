@@ -22,7 +22,7 @@ export function AdminVenuePicker() {
   return (
     <div className="flex min-h-screen flex-col bg-[#0A0A1A] px-4 py-10">
       <div className="mx-auto w-full max-w-2xl">
-        <LogoG />
+        <LogoG href="/dashboard" />
         <h1 className="mt-6 font-display text-2xl font-bold text-white">Panel de locales</h1>
         <p className="mt-2 text-sm text-slate-400">
           Como administrador de la plataforma, elige un local para abrir el mismo panel que ven los dueños

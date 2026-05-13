@@ -1,24 +1,17 @@
 "use client";
 
-import type { ComponentProps } from "react";
+import { useRef } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { X } from "lucide-react";
 import { useCallback, useEffect } from "react";
-import {
-  AREA_SUBMENU_PANEL_ID,
-  getQuickAreaById,
-  type QuickAreaConfig,
-} from "@/components/dashboard/quickActions.config";
-import { AccessControlPanel } from "@/components/dashboard/panels/AccessControlPanel";
-import { CashRegisterPanel } from "@/components/dashboard/panels/CashRegisterPanel";
-import { EventsPanel } from "@/components/dashboard/panels/EventsPanel";
-import { SalesPanel } from "@/components/dashboard/panels/SalesPanel";
-import { SettingsPanel } from "@/components/dashboard/panels/SettingsPanel";
-import { StatsPanel } from "@/components/dashboard/panels/StatsPanel";
-import type { MobileAnalytics } from "@/components/dashboard/panels/mobilePanelTypes";
-import type { UpcomingEventModel } from "@/components/dashboard/upcoming/UpcomingEventCard";
+import { AREA_SUBMENU_PANEL_ID, getQuickAreaById } from "@/components/dashboard/quickActions.config";
+import { DashboardAreaPanel } from "@/components/dashboard/DashboardAreaPanel";
+import type { AreaSubmenuPanelProps } from "@/components/dashboard/dashboardAreaTypes";
+import { SalesMenuDropdown } from "@/components/dashboard/panels/SalesMenuDropdown";
 import type { QuickAreaId } from "@/components/dashboard/quickActions.config";
 import { MOBILE_AREA_BORDER_L } from "@/components/dashboard/mobile/shared/mobileAreaTokens";
+
+export type { AreaSubmenuPanelProps };
 
 const panelVariants = {
   initial: { opacity: 0, y: -10 },
@@ -34,17 +27,6 @@ const panelVariants = {
   },
 };
 
-export type AreaSubmenuPanelProps = {
-  upcomingEvents: UpcomingEventModel[];
-  stats: ComponentProps<typeof EventsPanel>["stats"];
-  analytics: MobileAnalytics | null;
-  loading: boolean;
-  nowMs: number;
-  venueId: string;
-  venueCity?: string;
-  onRefreshData?: () => void;
-};
-
 export function AreaSubmenu({
   activeAreaId,
   onClose,
@@ -56,12 +38,18 @@ export function AreaSubmenu({
   nowMs,
   venueId,
   venueCity,
+  venueName,
+  venueAddress,
   onRefreshData,
 }: {
   activeAreaId: string | null;
   onClose: () => void;
   opsAlertCount: number;
 } & AreaSubmenuPanelProps) {
+  const ventasCloseGuardRef = useRef<(() => boolean) | null>(null);
+  const accessCloseGuardRef = useRef<(() => boolean) | null>(null);
+  const statsCloseGuardRef = useRef<(() => boolean) | null>(null);
+  const cajaCloseGuardRef = useRef<(() => boolean) | null>(null);
   const cfg = getQuickAreaById(activeAreaId);
   const BubbleIcon = cfg?.bubbleIcon;
 
@@ -80,37 +68,6 @@ export function AreaSubmenu({
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [activeAreaId, onKeyDown]);
-
-  function panelBody(area: QuickAreaConfig) {
-    switch (area.id) {
-      case "eventos":
-        return (
-          <EventsPanel
-            area={area}
-            venueId={venueId}
-            venueCity={venueCity}
-            upcomingEvents={upcomingEvents}
-            stats={stats}
-            loading={loading}
-            nowMs={nowMs}
-            opsAlertCount={opsAlertCount}
-            onRefresh={onRefreshData}
-          />
-        );
-      case "ventas":
-        return <SalesPanel area={area} stats={stats} analytics={analytics} opsAlertCount={opsAlertCount} />;
-      case "acceso":
-        return <AccessControlPanel area={area} stats={stats} opsAlertCount={opsAlertCount} />;
-      case "caja":
-        return <CashRegisterPanel area={area} opsAlertCount={opsAlertCount} />;
-      case "estadisticas":
-        return <StatsPanel stats={stats} analytics={analytics} />;
-      case "config":
-        return <SettingsPanel area={area} opsAlertCount={opsAlertCount} />;
-      default:
-        return null;
-    }
-  }
 
   return (
     <AnimatePresence mode="wait">
@@ -149,17 +106,67 @@ export function AreaSubmenu({
               <BubbleIcon className={`h-5 w-5 shrink-0 ${cfg.accentTextClass}`} aria-hidden />
               <span className="truncate text-sm font-semibold text-white">{cfg.label}</span>
             </div>
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-lg p-2 text-slate-400 transition hover:bg-white/[0.06] hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2979FF]/50"
-              aria-label="Cerrar panel de acciones"
-            >
-              <X className="h-5 w-5" aria-hidden />
-            </button>
+            <div className="flex shrink-0 items-center gap-0.5">
+              {cfg.id === "ventas" ? (
+                <SalesMenuDropdown onRefresh={onRefreshData} />
+              ) : null}
+              <button
+                type="button"
+                onClick={() => {
+                  if (cfg.id === "ventas") {
+                    const guard = ventasCloseGuardRef.current;
+                    if (guard?.()) return;
+                  }
+                  if (cfg.id === "acceso") {
+                    const guard = accessCloseGuardRef.current;
+                    if (guard?.()) return;
+                  }
+                  if (cfg.id === "estadisticas") {
+                    const guard = statsCloseGuardRef.current;
+                    if (guard?.()) return;
+                  }
+                  if (cfg.id === "caja") {
+                    const guard = cajaCloseGuardRef.current;
+                    if (guard?.()) return;
+                  }
+                  onClose();
+                }}
+                className="rounded-lg p-2 text-slate-400 transition hover:bg-white/[0.06] hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2979FF]/50"
+                aria-label="Cerrar panel de acciones"
+              >
+                <X className="h-5 w-5" aria-hidden />
+              </button>
+            </div>
           </div>
 
-          <div className="min-w-0">{panelBody(cfg)}</div>
+          <div className="min-w-0">
+            <DashboardAreaPanel
+              area={cfg}
+              opsAlertCount={opsAlertCount}
+              onRegisterVentasCloseGuard={(fn) => {
+                ventasCloseGuardRef.current = fn;
+              }}
+              onRegisterAccessCloseGuard={(fn) => {
+                accessCloseGuardRef.current = fn;
+              }}
+              onRegisterStatsCloseGuard={(fn) => {
+                statsCloseGuardRef.current = fn;
+              }}
+              onRegisterCajaCloseGuard={(fn) => {
+                cajaCloseGuardRef.current = fn;
+              }}
+              upcomingEvents={upcomingEvents}
+              stats={stats}
+              analytics={analytics}
+              loading={loading}
+              nowMs={nowMs}
+              venueId={venueId}
+              venueCity={venueCity}
+              venueName={venueName}
+              venueAddress={venueAddress}
+              onRefreshData={onRefreshData}
+            />
+          </div>
         </motion.div>
       ) : null}
     </AnimatePresence>

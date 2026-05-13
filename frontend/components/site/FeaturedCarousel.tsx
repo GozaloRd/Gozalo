@@ -324,7 +324,7 @@ export default function FeaturedCarousel({ items }: Props) {
 
 
 
-              const evHref = `/eventos/${ev.slug}`;
+              const evHref = `/e/${ev.slug}`;
 
               const evSold =
 

@@ -1,25 +1,19 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
 import { DashboardProvider } from "@/contexts/DashboardContext";
 import { DashboardUIProvider } from "@/contexts/DashboardUIContext";
 import { VenueOwnerDashboardRoot } from "@/components/dashboard/VenueOwnerDashboardRoot";
 
 /**
  * /dashboard/admin y /dashboard/cliente usan layouts propios (sin DashboardProvider de local).
+ *
+ * Importante: no omitir `{children}` en ninguna rama — si no, el SSR de Next no monta la página
+ * y puede romper hooks del runtime (`useContext` / `usePathname`).
  */
 export default function DashboardLayoutRouter({ children }: { children: React.ReactNode }) {
-  const path = usePathname();
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
-
-  const skipVenue =
-    path?.startsWith("/dashboard/admin") || path?.startsWith("/dashboard/cliente");
-
-  if (!mounted) {
-    return <div className="min-h-screen bg-[#0A0A0F]" aria-hidden />;
-  }
+  const path = usePathname() ?? "";
+  const skipVenue = path.startsWith("/dashboard/admin") || path.startsWith("/dashboard/cliente");
 
   if (skipVenue) {
     return <>{children}</>;

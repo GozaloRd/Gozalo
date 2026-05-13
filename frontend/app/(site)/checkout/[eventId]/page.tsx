@@ -1,29 +1,24 @@
-import type { EventImageFooterTheme } from "@/lib/eventFooterTheme";
+import { Suspense } from "react";
+import { PurchaseFlowEmbeddedCard } from "@/components/public-event/PurchaseFlowTransition";
 import { getEventCoverImageUrl } from "@/lib/eventCoverImage";
 import { fetchPublicEventById } from "@/lib/publicApi";
-import { precomputeServerFooterThemes } from "@/lib/serverEventFooterColor";
 import { CheckoutClient } from "./CheckoutClient";
+
+function CheckoutLoading() {
+  return (
+    <div className="flex min-h-screen flex-col items-center justify-center bg-black px-4">
+      <PurchaseFlowEmbeddedCard title="Preparando checkout…" subtitle="Cargando pago seguro" icon="ticket" />
+    </div>
+  );
+}
 
 export default async function CheckoutPage({ params }: { params: { eventId: string } }) {
   const event = await fetchPublicEventById(params.eventId);
-  let serverFooterTheme: EventImageFooterTheme | null = null;
-  let initialCoverForTheme: string | null = null;
-  if (event) {
-    initialCoverForTheme = getEventCoverImageUrl(event);
-    if (initialCoverForTheme) {
-      const themes = await precomputeServerFooterThemes(
-        [{ id: event.id, image: initialCoverForTheme }],
-        { maxUniqueImages: 1, concurrency: 1 }
-      );
-      serverFooterTheme = themes[event.id] ?? null;
-    }
-  }
+  const initialCoverForTheme = event ? getEventCoverImageUrl(event) : null;
 
   return (
-    <CheckoutClient
-      eventId={params.eventId}
-      initialCoverForTheme={initialCoverForTheme}
-      serverFooterTheme={serverFooterTheme}
-    />
+    <Suspense fallback={<CheckoutLoading />}>
+      <CheckoutClient eventId={params.eventId} initialCoverForTheme={initialCoverForTheme} />
+    </Suspense>
   );
 }

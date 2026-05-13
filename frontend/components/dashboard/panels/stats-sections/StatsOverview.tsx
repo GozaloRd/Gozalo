@@ -40,14 +40,15 @@ export function StatsOverview({
   const occ = analytics?.summary?.occupancyCurrent;
   const salesByDay = analytics?.charts?.salesByDay ?? [];
   const revMonth = stats?.revenue?.totalRD?.month ?? 0;
+  const ticketRevenue = Number(analytics?.revenueChannels?.combined?.entradas?.total ?? 0);
+  const ticketsTotal = Number(analytics?.summary?.tickets?.total ?? 0);
   const avgTicket =
-    analytics?.summary?.tickets?.total && analytics.summary.revenue?.total
-      ? analytics.summary.revenue.total / Math.max(1, analytics.summary.tickets.total)
+    ticketsTotal > 0 && ticketRevenue > 0
+      ? ticketRevenue / ticketsTotal
       : 0;
 
   const nEvents = analytics?.charts?.revenueByEvent?.length ?? 0;
-  const ticketsTotal = analytics?.summary?.tickets?.total;
-  const asistenciaStr = ticketsTotal != null ? String(ticketsTotal) : "—";
+  const asistenciaStr = ticketsTotal > 0 ? String(ticketsTotal) : "—";
   const ocupacionMedia = occ ? `${Math.round(occ.percentage)}%` : "—";
 
   const monthlySeries = useMemo(() => {
