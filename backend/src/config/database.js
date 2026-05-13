@@ -12,6 +12,17 @@ const dbName = (process.env.DB_NAME || '').trim();
 const dbUser = (process.env.DB_USER || '').trim();
 const dbPassword = process.env.DB_PASSWORD != null ? String(process.env.DB_PASSWORD).trim() : '';
 
+// SSL requerido por Postgres gestionados (Supabase, Neon, Render, Heroku, RDS...).
+// Se activa si DB_SSL=true, NODE_ENV=production, o si la URL incluye un host gestionado conocido.
+const databaseUrl = (process.env.DATABASE_URL || '').trim();
+const isManagedHost = /supabase\.co|neon\.tech|render\.com|amazonaws\.com|herokuapp\.com|railway\.app/i.test(
+  databaseUrl
+);
+const sslEnabled =
+  process.env.DB_SSL === 'true' ||
+  process.env.NODE_ENV === 'production' ||
+  isManagedHost;
+
 const commonOptions = {
   dialect: 'postgres',
   logging: process.env.NODE_ENV === 'development' ? console.log : false,
@@ -19,10 +30,17 @@ const commonOptions = {
     underscored: true,
     timestamps: true,
   },
+  ...(sslEnabled
+    ? {
+        dialectOptions: {
+          ssl: {
+            require: true,
+            rejectUnauthorized: false,
+          },
+        },
+      }
+    : {}),
 };
-
-// Opcional: DATABASE_URL=postgresql://user:pass@host:5432/db (prioridad sobre DB_*)
-const databaseUrl = (process.env.DATABASE_URL || '').trim();
 
 const sequelize = databaseUrl
   ? new Sequelize(databaseUrl, commonOptions)

@@ -1,0 +1,60 @@
+# Render Blueprint — Despliegue del backend Gózalo
+# https://render.com/docs/blueprint-spec
+#
+# Pasos:
+# 1. En https://render.com → New → Blueprint
+# 2. Conecta el repo GozaloRd/Gozalo
+# 3. Render detecta este archivo y te pide rellenar variables marcadas con sync: false
+# 4. Pulsa Apply: se crea el web service con disco persistente para uploads/
+
+services:
+  - type: web
+    name: gozalo-api
+    runtime: node
+    plan: free
+    region: oregon
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+    autoDeploy: true
+    disk:
+      name: uploads
+      mountPath: /opt/render/project/src/backend/uploads
+      sizeGB: 1
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 4000
+      # Pegar la "Connection string" del proyecto Supabase
+      # (Project Settings → Database → Connection string → URI, usa el "Pooler" en modo Session)
+      - key: DATABASE_URL
+        sync: false
+      - key: DB_SSL
+        value: "true"
+      # En el primer deploy, deja "1" para que Sequelize cree las tablas.
+      # Después de la primera arrancada exitosa, cambia a "0" para producción.
+      - key: DB_SYNC_ALTER
+        value: "1"
+      # Secret JWT para firmar tokens. Genera uno largo y aleatorio.
+      - key: JWT_SECRET
+        generateValue: true
+      # Dominio del frontend en Vercel (varios separados por coma)
+      - key: FRONTEND_URL
+        sync: false
+      # Regex para permitir previews de Vercel (opcional, recomendado)
+      - key: FRONTEND_URL_REGEX
+        value: "^https://.*\\.vercel\\.app$"
+      # Email opcional (Resend)
+      - key: RESEND_API_KEY
+        sync: false
+      - key: EMAIL_FROM
+        sync: false
+      # Seed del primer admin (rellena tras el primer deploy y ejecuta el job manualmente)
+      - key: SEED_ADMIN_EMAIL
+        sync: false
+      - key: SEED_ADMIN_PASSWORD
+        sync: false
+      - key: SEED_ADMIN_NAME
+        sync: false

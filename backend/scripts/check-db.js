@@ -15,7 +15,17 @@ async function main() {
 
   if (databaseUrl) {
     console.log('Probando DATABASE_URL (sin mostrar credenciales)');
-    const client = new Client({ connectionString: databaseUrl });
+    const isManagedHost =
+      /supabase\.co|neon\.tech|render\.com|amazonaws\.com|herokuapp\.com|railway\.app/i.test(
+        databaseUrl
+      );
+    const ssl =
+      process.env.DB_SSL === 'true' ||
+      process.env.NODE_ENV === 'production' ||
+      isManagedHost
+        ? { rejectUnauthorized: false }
+        : undefined;
+    const client = new Client({ connectionString: databaseUrl, ssl });
     try {
       await client.connect();
       const r = await client.query('SELECT current_database(), current_user');

@@ -34,19 +34,34 @@ const splitRoutes = require('./routes/split.routes');
 const app = express();
 const PORT = process.env.PORT || 4000;
 
+// FRONTEND_URL admite varias URLs separadas por coma (p. ej. dominio + preview de Vercel).
+// FRONTEND_URL_REGEX permite un patrón (p. ej. ^https://.*\.vercel\.app$ para todos los previews).
 const allowedOrigins = [
-  process.env.FRONTEND_URL,
+  ...(process.env.FRONTEND_URL || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean),
   'http://localhost:3000',
   'http://localhost:3001',
   'http://127.0.0.1:3000',
   'http://127.0.0.1:3001',
-].filter(Boolean);
+];
+
+let originRegex = null;
+if (process.env.FRONTEND_URL_REGEX) {
+  try {
+    originRegex = new RegExp(process.env.FRONTEND_URL_REGEX);
+  } catch (e) {
+    console.warn('[CORS] FRONTEND_URL_REGEX inválido, ignorando:', e.message);
+  }
+}
 
 app.use(
   cors({
     origin(origin, callback) {
       if (!origin) return callback(null, true);
       if (allowedOrigins.includes(origin)) return callback(null, true);
+      if (originRegex && originRegex.test(origin)) return callback(null, true);
       return callback(new Error(`CORS bloqueado para origen: ${origin}`));
     },
     credentials: true,
